@@ -1,5 +1,5 @@
 Author: Remigijus Kiminas
-Version: 2.0
+Version: 1.0
 
 This module brings nodejs as transport helper. Note all messages are synced using nodejs but the most frequest does.
 
@@ -24,14 +24,16 @@ npm install forever
 
 You may need to symlink forever to /user/bin/forever
 
-Adjust bellow according to your needs.
+adduser nodejs
 
 vim /usr/lib/systemd/system/nodejshelper.service
 [Unit]
 Description=Live helper chat NodeJS Daemon
 
 [Service]
+User=nodejs
 ExecStart=/usr/bin/forever /var/www/client/lhc_web/extension/nodejshelper/server/server.js
+LimitNOFILE=100000
 
 [Install]
 WantedBy=multi-user.target
