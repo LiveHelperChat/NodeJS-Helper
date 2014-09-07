@@ -81,7 +81,7 @@
 				onConnected : function() {
 				
 					if (lhinst.chat_id > 0) {
-						nodejshelper.socket.emit('join',lhinst.chat_id);
+						nodejshelper.socket.emit('join',{chat_id:lhinst.chat_id,instance_id:nodejshelperConfig.instance_id});
 					};
 				},
 				
@@ -106,7 +106,7 @@
 				},
 				
 				syncforceaction : function(chat_id) {
-					nodejshelper.socket.emit('syncforce',chat_id);
+					nodejshelper.socket.emit('syncforce',{chat_id:chat_id,instance_id:nodejshelperConfig.instance_id});
 				},
 				
 				userleftchat : function(chat_id) {					
@@ -120,11 +120,11 @@
 				},
 				
 				addmsguser : function(inst) {
-					nodejshelper.socket.emit('userpostedmessage',{chat_id:inst.chat_id});
+					nodejshelper.socket.emit('userpostedmessage',{chat_id:inst.chat_id,instance_id:nodejshelperConfig.instance_id});
 				},
 
 				addmsguserbefore : function(inst) {
-					nodejshelper.socket.emit('userstartedpostmessage',{chat_id:inst.chat_id});
+					nodejshelper.socket.emit('userstartedpostmessage',{chat_id:inst.chat_id,instance_id:nodejshelperConfig.instance_id});
 				},
 				
 				userpostedmessage : function() {					
@@ -142,29 +142,29 @@
 					clearTimeout(inst.userTimeout);						
 					nodejshelper.setupForceTimeout();
 					if (nodejshelper.operatorForced == false){
-						nodejshelper.socket.emit('newmessage',{chat_id:inst.chat_id,data:data});
+						nodejshelper.socket.emit('newmessage',{chat_id:inst.chat_id,data:data,instance_id:nodejshelperConfig.instance_id});
 					};
 					nodejshelper.operatorForced = false;
 				},
 					
 				addmsguserchatbox : function(inst,data) {
 					nodejshelper.operatorForced = true;
-					nodejshelper.socket.emit('newmessage',{chat_id:inst.chat_id,data:data});
+					nodejshelper.socket.emit('newmessage',{chat_id:inst.chat_id,data:data,instance_id:nodejshelperConfig.instance_id});
 					return false;
 				},
 				
 				addSynchroChat : function(chat_id,message_id) {					
 					if (nodejshelper.socket) {
-						nodejshelper.socket.emit('join',chat_id);
+						nodejshelper.socket.emit('join',{chat_id:chat_id,instance_id:nodejshelperConfig.instance_id});
 					} else {
 						setTimeout(function(){
-							nodejshelper.socket.emit('join',chat_id);
+							nodejshelper.socket.emit('join',{chat_id:chat_id,instance_id:nodejshelperConfig.instance_id});
 						},1000);
 					}
 				},
 				
 				removeSynchroChat : function(chat_id) {
-					nodejshelper.socket.emit('leave',chat_id);
+					nodejshelper.socket.emit('leave',{chat_id:chat_id,instance_id:nodejshelperConfig.instance_id});
 				},	
 				
 				syncadmincall : function(inst,data) {
@@ -173,42 +173,40 @@
 				
 				userleftchatNotification : function(chat_id) {
 					if (nodejshelper.socket) {
-						nodejshelper.socket.emit('userleftchat',chat_id);
+						nodejshelper.socket.emit('userleftchat',{chat_id:chat_id,instance_id:nodejshelperConfig.instance_id});
 					}
 				},
 				
 				addFileUserUpload : function(chat_id) {
-					nodejshelper.socket.emit('syncforce',chat_id);
+					nodejshelper.socket.emit('syncforce',{chat_id:chat_id,instance_id:nodejshelperConfig.instance_id});
 					lhinst.syncusercall();
 				},
 				
 				addFileUpload : function(chat_id) {
-					nodejshelper.socket.emit('syncforce',chat_id);
+					nodejshelper.socket.emit('syncforce',{chat_id:chat_id,instance_id:nodejshelperConfig.instance_id});
 					lhinst.syncadmincall();
 				},
 				
 				addRemoteCommand : function(chat_id) {
-					nodejshelper.socket.emit('syncforce',chat_id);					
+					nodejshelper.socket.emit('syncforce',{chat_id:chat_id,instance_id:nodejshelperConfig.instance_id});					
 				},
 								
 				typingStoppedUserInform : function(data) {					
-					nodejshelper.socket.emit('usertyping',data);
+					nodejshelper.socket.emit('usertyping',{chat_data:data,instance_id:nodejshelperConfig.instance_id});
 				},
 				
 				initTypingMonitoringUserInform : function(data) {
-					nodejshelper.socket.emit('usertyping',data);
+					nodejshelper.socket.emit('usertyping',{chat_data:data,instance_id:nodejshelperConfig.instance_id});
 				},
 				
 				initTypingMonitoringAdminInform : function(data) {
 					data.msg = nodejshelperConfig.typer;
-					nodejshelper.socket.emit('operatortyping',data);
+					nodejshelper.socket.emit('operatortyping',{chat_data:data,instance_id:nodejshelperConfig.instance_id});
 				},
 				
 				typingStoppedOperatorInform : function(data) {
-					nodejshelper.socket.emit('operatortyping',data);
-				}			
-				
-				
+					nodejshelper.socket.emit('operatortyping',{chat_data:data,instance_id:nodejshelperConfig.instance_id});
+				}				
 		};
 
 		// Give half second for standard script to finish their job
