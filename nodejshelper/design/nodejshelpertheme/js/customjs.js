@@ -22,6 +22,7 @@
 					this.socket.on('addfileuserupload', this.syncForce);
 					this.socket.on('userpostedmessage', this.userpostedmessage);
 					this.socket.on('userstartedpostmessage', this.userstartedpostmessage);
+					this.socket.on('syncbackoffice', this.syncbackoffice);
 					
 					// Disable standard sync method
 					// We will use node JS notifications
@@ -78,11 +79,19 @@
 					}
 				},
 				
-				onConnected : function() {
-				
+				onConnected : function() {				
 					if (lhinst.chat_id > 0) {
 						nodejshelper.socket.emit('join',{chat_id:lhinst.chat_id,instance_id:nodejshelperConfig.instance_id});
 					};
+					
+					if (nodejshelperConfig.is_admin && nodejshelperConfig.use_publish_notifications) {
+						nodejshelper.socket.emit('join_admin',{instance_id:nodejshelperConfig.instance_id});
+						try {
+							angular.element('body').scope().setTimeoutEnabled = false; 	
+						} catch(err) {		     
+				        	//
+				        };
+					}
 				},
 				
 				usertyping : function(data) {
@@ -111,6 +120,34 @@
 				
 				userleftchat : function(chat_id) {					
 					lhinst.syncadmincall();
+				},
+				
+				// Back office delay sync algorithm
+				// Sync back office instantly if 10 seconds passed since last sync, 
+				// if not just schedule sync for future
+				canSyncAdmin : true,
+				timeoutSchedule : null,				
+				syncbackoffice : function(syncMethod) {					
+					if (nodejshelper.canSyncAdmin == true && syncMethod == 'snow') {
+						try {							
+							nodejshelper.canSyncAdmin = false;
+							var lhcController = angular.element('body').scope(); 
+							lhcController.loadChatList();
+							
+							// Enable sync only if 10 seconds passed from last sync, to avoid overwhelming server
+							setTimeout(function(){
+								nodejshelper.canSyncAdmin = true;
+							},10000);
+							
+						} catch(err) {
+				        	//
+				        };
+					} else {	
+						clearTimeout(nodejshelper.timeoutSchedule);
+						nodejshelper.timeoutSchedule = setTimeout(function(){
+							nodejshelper.syncbackoffice('snow');
+						},10000);
+					};					
 				},
 				
 				userjoined : function(chat_id) {	

@@ -1,11 +1,12 @@
 Author: Remigijus Kiminas
-Version: 1.0
+Version: 1.1
 
-This module brings nodejs as transport helper. Note all messages are synced using nodejs but the most frequest does.
+This module brings nodejs as transport helper. Not all messages are synced using nodejs but the most frequest does.
 
 Requirements:
 a. nodejs on server
 b. Browser with WebSockets support.
+c. Redis[optional]
 
 Install:
 1. Put nodejshelper on your server extensions folder.
@@ -21,6 +22,8 @@ Node socket install on centos
 yum install nodejs npm
 npm install socket.io
 npm install forever
+[Optional for redis]
+npm install redis
 
 You may need to symlink forever to /user/bin/forever
 

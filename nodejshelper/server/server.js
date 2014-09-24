@@ -1,6 +1,11 @@
 var http = require('http').createServer(handler)
    , config = require('./settings'); 
-   
+
+if (config.use_publish_notifications == true) {
+	const redis = require('redis');
+	const redisClient = redis.createClient(config.redis.port,config.redis.host,config.redis.options);
+}
+
 var io = require(config.socketiopath).listen(http);
 
 // enable all transports (optional if you want flashsocket support, please note that some hosting
@@ -20,9 +25,10 @@ function handler(req, res) {
   res.writeHead(200);
   res.end();
 }
-
+console.log(config.debug.output);
 io.sockets.on('connection', function (socket) {
-
+  var redisClient = null;
+  
   socket.on('newmessage', function (data) {
   		if (config.debug.output == true) {
   			console.log('newmessage:'+data.instance_id+'_'+data.chat_id); 	
@@ -66,13 +72,27 @@ io.sockets.on('connection', function (socket) {
   		}; 	
     	socket.broadcast.to('chat_room_'+data.instance_id+'_'+data.chat_id).emit('userleftchat', data.chat_id);
   });
-
+  
   socket.on('join', function (data) {
+	  if (config.debug.output == true) {
+		  console.log('join:'+data.instance_id+'_'+data.chat_id);  
+	  };		
+	  socket.join('chat_room_'+data.instance_id+'_'+data.chat_id);
+	  socket.broadcast.to('chat_room_'+data.instance_id+'_'+data.chat_id).emit('userjoined', data.chat_id);
+  });
+
+  socket.on('join_admin', function (data) {
   		if (config.debug.output == true) {
-  			console.log('join:'+data.instance_id+'_'+data.chat_id);  
-  		};		
-  		socket.join('chat_room_'+data.instance_id+'_'+data.chat_id);
-  		socket.broadcast.to('chat_room_'+data.instance_id+'_'+data.chat_id).emit('userjoined', data.chat_id);
+  			console.log('join_admin:'+data.instance_id);  
+  		};
+  		if (redis !== undefined) {
+	  		redisClient = redis.createClient(config.redis.port,config.redis.host,config.redis.options);
+	  	    redisClient.subscribe('admin_room_' + data.instance_id); 
+	  	    
+	  	    redisClient.on("message", function(channel, message) {          
+	  		  socket.emit('syncbackoffice',message);
+	        });  
+  	    };	    
   });
 
   socket.on('leave', function (data) {
@@ -87,5 +107,12 @@ io.sockets.on('connection', function (socket) {
   			console.log('syncforce:'+data.instance_id+'_'+data.chat_id); 	
   		};
     	socket.broadcast.to('chat_room_'+data.instance_id+'_'+data.chat_id).emit('syncforce', data.chat_id)
-  });  
+  });
+  
+  socket.on('disconnect', function() {
+	  if (redisClient !== null) {
+		  redisClient.quit();
+      }
+  }); 
+  
 });
