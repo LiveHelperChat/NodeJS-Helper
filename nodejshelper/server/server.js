@@ -25,7 +25,7 @@ function handler(req, res) {
   res.writeHead(200);
   res.end();
 }
-console.log(config.debug.output);
+
 io.sockets.on('connection', function (socket) {
   var redisClient = null;
   
