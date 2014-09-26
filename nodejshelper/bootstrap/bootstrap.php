@@ -28,7 +28,9 @@ class erLhcoreClassExtensionNodejshelper {
 			$dispatcher->listen('chat.chat.chat_transfered',array($this,'notifyBackOfficeOperators'));	
 			
 			// Listed for desktop client events
-			$dispatcher->listen('chat.desktop_client_admin_msg',array($this,'notifyUserNewMessage'));		
+			$dispatcher->listen('chat.desktop_client_admin_msg',array($this,'notifyUserNewMessage'));	
+			$dispatcher->listen('chat.desktop_client_closed',array($this,'notifyUserNewMessage'));
+			$dispatcher->listen('chat.desktop_client_deleted',array($this,'notifyUserNewMessage'));
 		}
 	}	
 	
