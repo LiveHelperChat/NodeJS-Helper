@@ -25,17 +25,30 @@ function handler(req, res) {
   res.writeHead(200);
   res.end();
 }
-
+console.log(config.debug.output);
 io.sockets.on('connection', function (socket) {
   var redisClient = null;
+  
+  if (config.use_publish_notifications == true && config.ignore_desktop_client == false) {
+	  redisClient = redis.createClient(config.redis.port,config.redis.host,config.redis.options);
+		  
+	  redisClient.on("message", function(channel, message) {		   
+		  	if (channel.indexOf('admin_room_') !== -1){	  
+		  		socket.emit('syncbackoffice',message);
+	  		} else {
+	  			socket.broadcast.to(channel).emit('syncforce', message);
+	  		}
+	 });
+  }
   
   socket.on('newmessage', function (data) {
   		if (config.debug.output == true) {
   			console.log('newmessage:'+data.instance_id+'_'+data.chat_id); 	
   		};
-  		if (data.data.message_id != "0"){
+  		
+  		if (data.data.message_id != "0") {
   			socket.broadcast.to('chat_room_'+data.instance_id+'_'+data.chat_id).emit('newmessage', data);
-    	};
+    	}
   });
   
   socket.on('userpostedmessage', function (data) {
@@ -56,14 +69,14 @@ io.sockets.on('connection', function (socket) {
   		if (config.debug.output == true) {
   			console.log('usertyping:'+data.instance_id+'_'+data.chat_data.chat_id+'-'+data.chat_data.status); 
   		};	
-    	socket.broadcast.to('chat_room_'+data.instance_id+'_'+data.chat_data.chat_id).emit('usertyping', data.chat_data)
+    	socket.broadcast.to('chat_room_'+data.instance_id+'_'+data.chat_data.chat_id).emit('usertyping', data.chat_data);
   });
 
   socket.on('operatortyping', function (data) {
   		if (config.debug.output == true) {
   			console.log('operatortyping:'+data.instance_id+'_'+data.chat_data.chat_id+'-'+data.chat_data.status);
   		}; 	
-    	socket.broadcast.to('chat_room_'+data.instance_id+'_'+data.chat_data.chat_id).emit('operatortyping', data.chat_data)
+    	socket.broadcast.to('chat_room_'+data.instance_id+'_'+data.chat_data.chat_id).emit('operatortyping', data.chat_data);
   });
 
   socket.on('userleftchat', function (data) {
@@ -79,19 +92,28 @@ io.sockets.on('connection', function (socket) {
 	  };		
 	  socket.join('chat_room_'+data.instance_id+'_'+data.chat_id);
 	  socket.broadcast.to('chat_room_'+data.instance_id+'_'+data.chat_id).emit('userjoined', data.chat_id);
+	  
+	  if (config.use_publish_notifications == true && config.ignore_desktop_client == false) {
+		  if (config.debug.output == true) {
+			  console.log('subscribed_to_channel:'+'chat_room_' + data.instance_id + '_' + data.chat_id);
+		  }
+		  redisClient.subscribe('chat_room_' + data.instance_id + '_' + data.chat_id); 
+	  }
   });
 
   socket.on('join_admin', function (data) {
   		if (config.debug.output == true) {
   			console.log('join_admin:'+data.instance_id);  
   		};
-  		if (redis !== undefined) {
-	  		redisClient = redis.createClient(config.redis.port,config.redis.host,config.redis.options);
+  		
+  		if (redis !== undefined) {	  		
+  			if (config.use_publish_notifications == true && config.ignore_desktop_client == true) {
+  				redisClient = redis.createClient(config.redis.port,config.redis.host,config.redis.options);  				
+  				redisClient.on("message", function(channel, message) {          
+  			  		  socket.emit('syncbackoffice',message);
+  			    });  				
+  			};
 	  	    redisClient.subscribe('admin_room_' + data.instance_id); 
-	  	    
-	  	    redisClient.on("message", function(channel, message) {          
-	  		  socket.emit('syncbackoffice',message);
-	        });  
   	    };	    
   });
 
@@ -100,13 +122,17 @@ io.sockets.on('connection', function (socket) {
   			console.log('leave:'+data.instance_id+'_'+data.chat_id);
   		};
   		socket.leave('chat_room_'+data.instance_id+'_'+data.chat_id);
+  		
+  		if (config.use_publish_notifications == true && config.ignore_desktop_client == false) {
+  			redisClient.unsubscribe('chat_room_' + data.instance_id + '_' + data.chat_id); 
+  	    }
   });
   
   socket.on('syncforce', function (data) { 
   		if (config.debug.output == true) {
   			console.log('syncforce:'+data.instance_id+'_'+data.chat_id); 	
   		};
-    	socket.broadcast.to('chat_room_'+data.instance_id+'_'+data.chat_id).emit('syncforce', data.chat_id)
+    	socket.broadcast.to('chat_room_'+data.instance_id+'_'+data.chat_id).emit('syncforce', data.chat_id);
   });
   
   socket.on('disconnect', function() {

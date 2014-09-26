@@ -22,7 +22,13 @@ class erLhcoreClassExtensionNodejshelper {
 			$dispatcher->listen('chat.data_changed_auto_assign',array($this,'notifyBackOfficeOperators'));		
 			$dispatcher->listen('chat.data_changed_assigned_department',array($this,'notifyBackOfficeOperators'));		
 			$dispatcher->listen('chat.close',array($this,'notifyBackOfficeOperators'));		
-			$dispatcher->listen('chat.delete',array($this,'notifyBackOfficeOperators'));		
+			$dispatcher->listen('chat.delete',array($this,'notifyBackOfficeOperators'));	
+			$dispatcher->listen('chat.user_reopened',array($this,'notifyBackOfficeOperators'));	
+			$dispatcher->listen('chat.chat_transfer_accepted',array($this,'notifyBackOfficeOperators'));	
+			$dispatcher->listen('chat.chat.chat_transfered',array($this,'notifyBackOfficeOperators'));	
+			
+			// Listed for desktop client events
+			$dispatcher->listen('chat.desktop_client_admin_msg',array($this,'notifyUserNewMessage'));		
 		}
 	}	
 	
@@ -41,6 +47,16 @@ class erLhcoreClassExtensionNodejshelper {
 		try {			
 			$client = new Predis\Client($this->settings['redis']);			
 			$client->publish('admin_room_'.$this->settings['instance_id'],'sdelay');
+		} catch (Exception $e) {
+			echo $e->getMessage();
+		}
+	}
+	
+	public function notifyUserNewMessage($params)
+	{		
+		try {			
+			$client = new Predis\Client($this->settings['redis']);			
+			$client->publish('chat_room_'.$this->settings['instance_id'].'_'.$params['chat']->id,$params['chat']->id);						
 		} catch (Exception $e) {
 			echo $e->getMessage();
 		}

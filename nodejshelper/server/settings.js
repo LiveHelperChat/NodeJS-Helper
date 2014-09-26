@@ -6,6 +6,9 @@ var settings = {}
  * Set false to disable
  * */
 settings.use_publish_notifications = false;
+
+// If you will be using only web application set this to true, will save some resource
+settings.ignore_desktop_client = false;
 settings.redis = {};
 settings.redis.port = 6379;
 settings.redis.host = '127.0.0.1';

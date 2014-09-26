@@ -100,7 +100,9 @@
 					LHCCallbacks.uservoted = nodejshelper.syncforceaction;
 					LHCCallbacks.addRemoteCommand = nodejshelper.addRemoteCommand;
 					LHCCallbacks.addmsguser = nodejshelper.addmsguser;
-					LHCCallbacks.addmsguserbefore = nodejshelper.addmsguserbefore;
+					LHCCallbacks.addmsguserbefore = nodejshelper.addmsguserbefore;					
+					LHCCallbacks.chatDeletedCallback = nodejshelper.syncforceaction;
+					LHCCallbacks.chatClosedCallback = nodejshelper.syncforceaction;
 					
 					if (lhinst.chat_id > 0) {
 						// Disable standard sync method
@@ -165,6 +167,8 @@
 					LHCCallbacks.addRemoteCommand = false;
 					LHCCallbacks.addmsguser = false;
 					LHCCallbacks.addmsguserbefore = false;
+					LHCCallbacks.chatDeletedCallback = false;
+					LHCCallbacks.chatClosedCallback = false;
 				},
 							
 				usertyping : function(data) {
