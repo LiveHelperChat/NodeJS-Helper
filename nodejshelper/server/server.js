@@ -36,7 +36,7 @@ io.sockets.on('connection', function (socket) {
 		  	if (channel.indexOf('admin_room_') !== -1){	  
 		  		socket.emit('syncbackoffice',message);
 	  		} else {
-	  			socket.broadcast.to(channel).emit('syncforce', message);
+	  			socket.emit('syncforce', message);
 	  		}
 	 });
   }
