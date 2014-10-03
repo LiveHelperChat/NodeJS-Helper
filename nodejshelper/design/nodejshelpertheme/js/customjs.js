@@ -103,6 +103,7 @@
 					LHCCallbacks.addmsguserbefore = nodejshelper.addmsguserbefore;					
 					LHCCallbacks.chatDeletedCallback = nodejshelper.syncforceaction;
 					LHCCallbacks.chatClosedCallback = nodejshelper.syncforceaction;
+					LHCCallbacks.userRedirectedContact = nodejshelper.syncforceaction;
 					
 					if (lhinst.chat_id > 0) {
 						// Disable standard sync method
