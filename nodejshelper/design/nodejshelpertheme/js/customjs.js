@@ -7,6 +7,7 @@
 				
 				intervalSyncTimeout : null,
 				chatActivated : false,
+				hideOperator : null,
 				
 				init : function(){
 					this.socket = io.connect(nodejshelperHostConnect,{secure:nodejshelperConfig.secure});
@@ -183,10 +184,11 @@
 				operatortyping : function(data) {
 					if (lhinst.chat_id == data.chat_id && nodejshelper.isConnected == true) {
 						if (data.status == false) {
-							setTimeout(function(){
+							nodejshelper.hideOperator = setTimeout(function(){
 								$('#id-operator-typing').css('visibility','hidden');
-							},1000);							
-						} else {
+							},2000);
+						} else {					
+							clearTimeout(nodejshelper.hideOperator);
 							$('#id-operator-typing').css('visibility','visible').text(data.msg);
 						}
 					}
