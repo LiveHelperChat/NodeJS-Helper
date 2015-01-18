@@ -174,9 +174,9 @@
 							
 				usertyping : function(data) {
 					if (data.status == false) {
-						$('#user-is-typing-'+data.chat_id).fadeOut();
+						$('#user-is-typing-'+data.chat_id).css('visibility','hidden');
 					} else {
-						$('#user-is-typing-'+data.chat_id).fadeIn().text(data.msg);
+						$('#user-is-typing-'+data.chat_id).css('visibility','visible').text(data.msg);
 					}
 				},
 					
@@ -184,10 +184,10 @@
 					if (lhinst.chat_id == data.chat_id && nodejshelper.isConnected == true) {
 						if (data.status == false) {
 							setTimeout(function(){
-								$('#id-operator-typing').fadeOut();
+								$('#id-operator-typing').css('visibility','hidden');
 							},1000);							
 						} else {
-							$('#id-operator-typing').fadeIn().text(data.msg);
+							$('#id-operator-typing').css('visibility','visible').text(data.msg);
 						}
 					}
 				},
