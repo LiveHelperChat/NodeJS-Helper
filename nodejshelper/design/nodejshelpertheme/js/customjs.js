@@ -10,7 +10,7 @@
 				hideOperator : null,
 				
 				init : function(){
-					this.socket = io.connect(nodejshelperHostConnect,{secure:nodejshelperConfig.secure});
+					this.socket = io.connect(nodejshelperHostConnect,{secure:nodejshelperConfig.secure,path:nodejshelperConfig.path});
 					
 					this.socket.on('connect', this.onConnected);
 					this.socket.on('newmessage', this.onMessage);
