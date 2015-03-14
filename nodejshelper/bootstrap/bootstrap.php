@@ -16,6 +16,7 @@ class erLhcoreClassExtensionNodejshelper {
 			$dispatcher = erLhcoreClassChatEventDispatcher::getInstance();	
 			
 			// On what events should NodeJS listening operators be notified
+			$dispatcher->listen('chat.sync_back_office',array($this,'notifyBackOfficeOperators'));
 			$dispatcher->listen('chat.chat_started',array($this,'notifyBackOfficeOperators'));
 			$dispatcher->listen('chat.data_changed',array($this,'notifyBackOfficeOperators'));		
 			$dispatcher->listen('chat.unread_chat',array($this,'notifyBackOfficeOperatorsDelay'));		
@@ -26,6 +27,7 @@ class erLhcoreClassExtensionNodejshelper {
 			$dispatcher->listen('chat.user_reopened',array($this,'notifyBackOfficeOperators'));	
 			$dispatcher->listen('chat.chat_transfer_accepted',array($this,'notifyBackOfficeOperators'));	
 			$dispatcher->listen('chat.chat_transfered',array($this,'notifyBackOfficeOperators'));	
+			$dispatcher->listen('chat.sync_back_office',array($this,'notifyBackOfficeOperators'));
 			
 			// Listed for desktop client events
 			$dispatcher->listen('chat.desktop_client_admin_msg',array($this,'notifyUserNewMessage'));	
