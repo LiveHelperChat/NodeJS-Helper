@@ -123,7 +123,11 @@
 							nodejshelper.socket.emit('join_admin',{instance_id:nodejshelperConfig.instance_id});
 								
 							try {
-								angular.element('body').scope().setTimeoutEnabled = false; 	
+								angular.element('body').scope().setTimeoutEnabled = false;
+								
+								setInterval(function(){
+									nodejshelper.syncbackoffice('snow');									
+								},(nodejshelperConfig.online_timeout-10)*1000);
 							} catch(err) {		     
 					        	//
 					        };
