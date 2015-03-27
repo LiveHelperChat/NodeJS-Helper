@@ -33,6 +33,8 @@ class erLhcoreClassExtensionNodejshelper {
 			$dispatcher->listen('chat.desktop_client_admin_msg',array($this,'notifyUserNewMessage'));	
 			$dispatcher->listen('chat.desktop_client_closed',array($this,'notifyUserNewMessage'));
 			$dispatcher->listen('chat.desktop_client_deleted',array($this,'notifyUserNewMessage'));
+			$dispatcher->listen('chat.messages_added_passive',array($this,'notifyUserNewMessage'));
+			$dispatcher->listen('chat.nodjshelper_notify_delay',array($this,'notifyBackOfficeOperatorsDelay'));
 		}
 	}	
 	

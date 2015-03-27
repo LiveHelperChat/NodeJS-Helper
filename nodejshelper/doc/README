@@ -11,8 +11,11 @@ c. Redis[optional]
 Install:
 1. Put nodejshelper on your server extensions folder.
 2. Adjust settings in:
-2.1 extension/nodejshelper/server/settings.js file
-2.2 extension/nodejshelper/design/nodejshelpertheme/tpl/pagelayouts/parts/nodejshelper_config.tpl.php set your node.js server address and port.
+2.1 rename extension/nodejshelper/server/settings.default.js to extension/nodejshelper/server/settings.js
+2.1 Edit this file settings extension/nodejshelper/server/settings.js file
+2.2 copy extension/nodejshelper/design/nodejshelpertheme/tpl/pagelayouts/parts/nodejshelper_config.default.tpl.php 
+to extension/nodejshelper/design/nodejshelpertheme/tpl/pagelayouts/parts/nodejshelper_config.tpl.php 
+and set your node.js server address and port.
 3. Enable extension in settings.ini.php file.
 4. Clean cache from back office.
 5. run node server.js from extension/nodejshelper/server folder.
