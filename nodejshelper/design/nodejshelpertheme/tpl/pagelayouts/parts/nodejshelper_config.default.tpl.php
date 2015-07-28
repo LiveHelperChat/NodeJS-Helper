@@ -6,6 +6,7 @@
 	    'path' => '',
 		'secure' => false,
 		'use_cdn' => true,	// Should we use google provided socket.io.js library?, if you are using older version set it to false
+	    'use_local_socket_io_js' => false, // Load socket.io.js file from local filesystem. If use_cdn and use_local_socket_io_js will be false, system will try to load socket.io.js file from node server
 		'use_publish_notifications' => false,
 		'redis' => array (
 					'scheme' => 'tcp',

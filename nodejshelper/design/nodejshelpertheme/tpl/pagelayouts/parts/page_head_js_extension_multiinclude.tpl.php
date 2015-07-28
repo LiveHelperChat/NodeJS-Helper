@@ -11,6 +11,8 @@ nodejshelperConfig.typer = '<?php echo htmlspecialchars($userData->name_support,
 </script>
 <?php if ($nodeJsHelperSettings['use_cdn'] == true) : ?>
 <script src="https://cdn.socket.io/socket.io-1.1.0.js"></script>
+<?php elseif (isset($nodeJsHelperSettings['use_local_socket_io_js']) && $nodeJsHelperSettings['use_local_socket_io_js'] == true) : ?>
+<script type="text/javascript" language="javascript" src="<?php echo erLhcoreClassDesign::designJS('js/socket.io-1.1.0.js');?>"></script>
 <?php else : ?>
 <script src="<?php echo $nodeJsHelperSettings['prefix'],$nodeJsHelperSettings['host'],$nodeJsHelperSettings['port'],$nodeJsHelperSettings['path']?>/socket.io/socket.io.js"></script>
 <?php endif;?>
