@@ -34,6 +34,7 @@ class erLhcoreClassExtensionNodejshelper {
 			$dispatcher->listen('chat.desktop_client_closed',array($this,'notifyUserNewMessage'));
 			$dispatcher->listen('chat.desktop_client_deleted',array($this,'notifyUserNewMessage'));
 			$dispatcher->listen('chat.messages_added_passive',array($this,'notifyUserNewMessage'));
+			$dispatcher->listen('chat.data_changed_chat',array($this,'dataChangedChat'));
 			$dispatcher->listen('chat.nodjshelper_notify_delay',array($this,'notifyBackOfficeOperatorsDelay'));
 		}
 	}	
@@ -53,6 +54,16 @@ class erLhcoreClassExtensionNodejshelper {
 		try {			
 			$client = new Predis\Client($this->settings['redis']);			
 			$client->publish('admin_room_'.$this->settings['instance_id'],'sdelay');
+		} catch (Exception $e) {
+			echo $e->getMessage();
+		}
+	}
+	
+	public function dataChangedChat($params)
+	{		
+		try {			
+			$client = new Predis\Client($this->settings['redis']);			
+			$client->publish('chat_room_'.$this->settings['instance_id'].'_'.$params['chat_id'],$params['chat_id']);						
 		} catch (Exception $e) {
 			echo $e->getMessage();
 		}
