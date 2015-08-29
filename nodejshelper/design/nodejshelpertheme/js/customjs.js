@@ -222,6 +222,7 @@
 								nodejshelper.canSyncAdmin = false;
 								var lhcController = angular.element('body').scope(); 
 								lhcController.loadChatList();
+								lhinst.syncadmincall();
 								
 								// Enable sync only if 10 seconds passed from last sync, to avoid overhelming server
 								setTimeout(function(){
