@@ -105,6 +105,7 @@
 					LHCCallbacks.chatDeletedCallback = nodejshelper.syncforceaction;
 					LHCCallbacks.chatClosedCallback = nodejshelper.syncforceaction;
 					LHCCallbacks.userRedirectedContact = nodejshelper.syncforceaction;
+					LHCCallbacks.userRedirectedSurvey = nodejshelper.syncforceaction;
 					
 					if (lhinst.chat_id > 0) {
 						// Disable standard sync method
@@ -175,6 +176,8 @@
 					LHCCallbacks.addmsguserbefore = false;
 					LHCCallbacks.chatDeletedCallback = false;
 					LHCCallbacks.chatClosedCallback = false;
+					LHCCallbacks.userRedirectedContact = false;
+					LHCCallbacks.userRedirectedSurvey = false;
 				},
 							
 				usertyping : function(data) {

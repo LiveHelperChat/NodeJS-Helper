@@ -29,11 +29,14 @@ class erLhcoreClassExtensionNodejshelper {
 			$dispatcher->listen('chat.chat_transfered',array($this,'notifyBackOfficeOperators'));	
 			$dispatcher->listen('chat.sync_back_office',array($this,'notifyBackOfficeOperators'));
 			
+			// Listen to chat sub status changes
+			$dispatcher->listen('chat.set_sub_status',array($this,'notifyUserNewMessage'));
+						
 			// Listed for desktop client events
 			$dispatcher->listen('chat.desktop_client_admin_msg',array($this,'notifyUserNewMessage'));	
 			$dispatcher->listen('chat.desktop_client_closed',array($this,'notifyUserNewMessage'));
 			$dispatcher->listen('chat.desktop_client_deleted',array($this,'notifyUserNewMessage'));
-			$dispatcher->listen('chat.messages_added_passive',array($this,'notifyUserNewMessage'));
+			$dispatcher->listen('chat.messages_added_passive',array($this,'notifyUserNewMessage'));			
 			$dispatcher->listen('chat.data_changed_chat',array($this,'dataChangedChat'));
 			$dispatcher->listen('chat.nodjshelper_notify_delay',array($this,'notifyBackOfficeOperatorsDelay'));
 		}
