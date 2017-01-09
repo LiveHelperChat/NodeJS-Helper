@@ -28,7 +28,8 @@ class erLhcoreClassExtensionNodejshelper {
 			$dispatcher->listen('chat.chat_transfer_accepted',array($this,'notifyBackOfficeOperators'));	
 			$dispatcher->listen('chat.chat_transfered',array($this,'notifyBackOfficeOperators'));	
 			$dispatcher->listen('chat.sync_back_office',array($this,'notifyBackOfficeOperators'));
-			
+			$dispatcher->listen('survey.back_to_chat',array($this,'notifyBackOfficeOperators'));
+
 			// Listen to chat sub status changes
 			$dispatcher->listen('chat.set_sub_status',array($this,'notifyUserNewMessage'));
 						
