@@ -27,6 +27,7 @@ class erLhcoreClassExtensionNodejshelper {
 			$dispatcher->listen('chat.user_reopened',array($this,'notifyBackOfficeOperators'));	
 			$dispatcher->listen('chat.chat_transfer_accepted',array($this,'notifyBackOfficeOperators'));	
 			$dispatcher->listen('chat.chat_transfered',array($this,'notifyBackOfficeOperators'));	
+			$dispatcher->listen('chat.chat_transfered_force',array($this,'notifyBackOfficeOperators'));	
 			$dispatcher->listen('chat.sync_back_office',array($this,'notifyBackOfficeOperators'));
 			$dispatcher->listen('survey.back_to_chat',array($this,'notifyBackOfficeOperators'));
 
