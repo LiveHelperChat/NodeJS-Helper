@@ -5,7 +5,7 @@
 <?php if (erLhcoreClassSystem::instance()->SiteAccess == 'site_admin' && erLhcoreClassUser::instance()->isLogged()) : 
 $currentUser = erLhcoreClassUser::instance();
 $userData = $currentUser->getUserData(true); ?>
-nodejshelperConfig.typer = '<?php echo htmlspecialchars($userData->name_support,ENT_QUOTES);?> <?php echo erTranslationClassLhTranslation::getInstance()->getTranslation('chat/chat','is typing now...')?>';
+nodejshelperConfig.typer = typeof nodejshelperConfig.typer !== 'undefined' ? nodejshelperConfig.typer : '<?php echo htmlspecialchars($userData->name_support,ENT_QUOTES);?> <?php echo erTranslationClassLhTranslation::getInstance()->getTranslation('chat/chat','is typing now...')?>';
 <?php endif;?>
 </script>
 <?php if ($nodeJsHelperSettings['use_cdn'] == true) : ?>

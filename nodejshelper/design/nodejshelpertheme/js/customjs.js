@@ -363,9 +363,13 @@
 				},
 				
 				initTypingMonitoringAdminInform : function(data) {
-					if (nodejshelper.isConnected == true) {				
-						data.msg = nodejshelperConfig.typer;
-						nodejshelper.socket.emit('operatortyping',{chat_data:data,instance_id:nodejshelperConfig.instance_id});
+					if (nodejshelper.isConnected == true) {							
+						if (typeof nodejshelperConfig.typer === "string"){
+							data.msg = nodejshelperConfig.typer;
+							nodejshelper.socket.emit('operatortyping',{chat_data:data,instance_id:nodejshelperConfig.instance_id});
+						} else if (typeof nodejshelperConfig.typer === "function") {
+							nodejshelperConfig.typer(data, nodejshelper);
+						};
 					}
 				},
 				
