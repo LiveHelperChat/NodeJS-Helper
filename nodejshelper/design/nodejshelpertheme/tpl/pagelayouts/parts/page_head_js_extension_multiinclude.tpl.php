@@ -9,11 +9,9 @@ nodejshelperConfig.typer = typeof nodejshelperConfig.typer !== 'undefined' ? nod
 <?php endif;?>
 </script>
 <?php if ($nodeJsHelperSettings['use_cdn'] == true) : ?>
-<script src="https://cdn.socket.io/socket.io-1.1.0.js"></script>
-<?php elseif (isset($nodeJsHelperSettings['use_local_socket_io_js']) && $nodeJsHelperSettings['use_local_socket_io_js'] == true) : ?>
-<script type="text/javascript" language="javascript" src="<?php echo erLhcoreClassDesign::designJS('js/socket.io-1.1.0.js');?>"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.7.3/socket.io.min.js"></script>
 <?php else : ?>
-<script src="<?php echo $nodeJsHelperSettings['prefix'],$nodeJsHelperSettings['host'],$nodeJsHelperSettings['port'],$nodeJsHelperSettings['path']?>/socket.io/socket.io.js"></script>
+<script type="text/javascript" language="javascript" src="<?php echo erLhcoreClassDesign::designJS('js/socket.io.1.7.3.min.js');?>"></script>
 <?php endif;?>
 <script type="text/javascript" language="javascript" src="<?php echo erLhcoreClassDesign::designJS('js/customjs.js');?>"></script>
 <?php endif; ?>
