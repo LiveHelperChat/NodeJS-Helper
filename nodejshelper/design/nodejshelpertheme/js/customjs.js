@@ -129,6 +129,11 @@
 								setInterval(function(){
 									nodejshelper.syncbackoffice('snow');									
 								},(nodejshelperConfig.online_timeout-10)*1000);
+								
+								setInterval(function(){
+									nodejshelper.syncbackofficechats();									
+								},10000);
+								
 							} catch(err) {		     
 					        	//
 					        };
@@ -244,6 +249,15 @@
 					}
 				},
 				
+				canSyncBackOffice : true,
+				canSyncBackOfficeTimeout : true,
+				
+				syncbackofficechats : function() {
+					if (this.canSyncBackOffice == true) {
+						lhinst.syncadmincall();
+					}
+				},
+				
 				userjoined : function(chat_id) {	
 					if (nodejshelper.isConnected == true) {
 						setTimeout(function(){
@@ -320,7 +334,14 @@
 				
 				syncadmincall : function(inst,data) {
 					if (nodejshelper.isConnected == true) {
-						clearTimeout(inst.userTimeout);	
+						clearTimeout(inst.userTimeout);							
+						clearTimeout(nodejshelper.canSyncBackOfficeTimeout);
+						
+						// Enable automatic back office sync only after 30 seconds
+						nodejshelper.canSyncBackOffice = false;
+						nodejshelper.canSyncBackOfficeTimeout = setTimeout(function(){
+							nodejshelper.canSyncBackOffice = true;
+						},30000);
 					}
 				},
 				

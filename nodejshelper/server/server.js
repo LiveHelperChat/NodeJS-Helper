@@ -36,7 +36,7 @@ io.sockets.on('connection', function (socket) {
 		  redisClient = redis.createClient(config.redis.port,config.redis.host,config.redis.options);
 			  
 		  redisClient.on("message", function(channel, message) {		   
-			  	if (channel.indexOf('admin_room_') !== -1){	  
+			  	if (channel.indexOf('admin_room_') !== -1) {	  
 			  		socket.emit('syncbackoffice',message);
 		  		} else {
 		  			socket.emit('syncforce', message);
@@ -164,7 +164,7 @@ io.sockets.on('connection', function (socket) {
 					  socket.emit('syncbackoffice',message);
 				  });  				
 			  };
-			  redisClient.subscribe('admin_room_' + data.instance_id); 
+			  redisClient.subscribe('admin_room_' + data.instance_id);
 		  }
 	  } catch (e) {
 		  if (config.debug.output == true) {
