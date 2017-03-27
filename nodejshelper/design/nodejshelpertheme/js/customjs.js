@@ -132,7 +132,7 @@
 								
 								setInterval(function(){
 									nodejshelper.syncbackofficechats();									
-								},10000);
+								},confLH.back_office_sinterval);
 								
 							} catch(err) {		     
 					        	//
@@ -235,7 +235,7 @@
 								// Enable sync only if 10 seconds passed from last sync, to avoid overhelming server
 								setTimeout(function(){
 									nodejshelper.canSyncAdmin = true;
-								},10000);
+								},confLH.back_office_sinterval);
 								
 							} catch(err) {
 					        	//
@@ -244,7 +244,7 @@
 							clearTimeout(nodejshelper.timeoutSchedule);
 							nodejshelper.timeoutSchedule = setTimeout(function(){
 								nodejshelper.syncbackoffice('snow');
-							},10000);
+							},confLH.back_office_sinterval);
 						};
 					}
 				},
