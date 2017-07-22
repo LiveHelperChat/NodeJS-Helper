@@ -1,10 +1,9 @@
 var http = require('http').createServer(handler)
    , config = require('./settings'); 
 
-if (config.use_publish_notifications == true) {
-	const redis = require('redis');
-	const redisClient = redis.createClient(config.redis.port,config.redis.host,config.redis.options);
-}
+
+const redis = require('redis');
+const redisClient = redis.createClient(config.redis.port,config.redis.host,config.redis.options);
 
 var io = require(config.socketiopath).listen(http);
 
