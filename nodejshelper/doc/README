@@ -1,21 +1,17 @@
 Author: Remigijus Kiminas
-Version: 1.1
+Version: 2
 
-This module brings nodejs as transport helper. Not all messages are synced using nodejs but the most frequest does.
+This is rewrite from scratch for NodeJS Support
 
 Requirements:
 a. nodejs on server
 b. Browser with WebSockets support.
-c. Redis[optional]
+c. Redis
 
 Install:
 1. Put nodejshelper on your server extensions folder.
 2. Adjust settings in:
-2.1 rename extension/nodejshelper/server/settings.default.js to extension/nodejshelper/server/settings.js
-2.1 Edit this file settings extension/nodejshelper/server/settings.js file
-2.2 copy extension/nodejshelper/design/nodejshelpertheme/tpl/pagelayouts/parts/nodejshelper_config.default.tpl.php 
-to extension/nodejshelper/design/nodejshelpertheme/tpl/pagelayouts/parts/nodejshelper_config.tpl.php 
-and set your node.js server address and port.
+2.1 Edit this file extension/nodejshelper/settings/settings.ini.php
 3. Enable extension in settings.ini.php file.
 4. Clean cache from back office.
 5. run node server.js from extension/nodejshelper/server folder.
@@ -25,7 +21,6 @@ Node socket install on centos
 yum install nodejs npm
 npm install socket.io
 npm install forever
-[Optional for redis]
 npm install redis
 
 You may need to symlink forever to /user/bin/forever
@@ -48,13 +43,13 @@ Make it start everytime os starts
 systemctl enable nodejshelper.service
 
 Nginx config examples
-location /wschatnodejs/ {
+location /socketcluster/ {
 	  proxy_set_header X-Real-IP $remote_addr;
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
       proxy_set_header Host $http_host;
       proxy_set_header X-NginX-Proxy true;
 
-      proxy_pass http://127.0.0.1:31129/;
+      proxy_pass http://127.0.0.1:8000/;
       proxy_redirect off;
       proxy_http_version 1.1;
       proxy_set_header Upgrade $http_upgrade;
