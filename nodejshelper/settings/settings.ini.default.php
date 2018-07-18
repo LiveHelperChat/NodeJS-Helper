@@ -7,6 +7,8 @@ return array(
     'public_settings' => array(
         'hostname' => '//' . $_SERVER['HTTP_HOST'],
         'path' => '/socketcluster/',
+        'port' => null, //some custom port
+        'secure' => null, // true || false
     )
 );
 

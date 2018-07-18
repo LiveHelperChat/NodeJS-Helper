@@ -1,10 +1,20 @@
 (function() {
 
+	var socketOptions = {
+        hostname: lh_inst.nodejsHelperOptions.hostname,
+        path: lh_inst.nodejsHelperOptions.path
+    }
+
+    if (lh_inst.nodejsHelperOptions.port != '') {
+        socketOptions.port = parseInt(lh_inst.nodejsHelperOptions.port);
+    }
+
+    if (lh_inst.nodejsHelperOptions.secure == 1) {
+        socketOptions.secure = true;
+    }
+
 	// Initiate the connection to the server
-	var socket = socketCluster.connect({
-		hostname: lh_inst.nodejsHelperOptions.hostname,
-		path: lh_inst.nodejsHelperOptions.path
-	});
+	var socket = socketCluster.connect(socketOptions);
 
 	socket.on('error', function (err) {
 		console.error(err);

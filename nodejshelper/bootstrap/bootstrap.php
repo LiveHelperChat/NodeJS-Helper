@@ -41,6 +41,14 @@ class erLhcoreClassExtensionNodejshelper {
                 return $this->settings['public_settings']['path'];
                 break;
 
+            case 'port':
+                return $this->settings['public_settings']['port'];
+                break;
+
+            case 'secure':
+                return $this->settings['public_settings']['secure'];
+                break;
+
             default:
                 return null;
                 ;
