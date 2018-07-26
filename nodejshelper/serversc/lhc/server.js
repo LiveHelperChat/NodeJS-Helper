@@ -19,7 +19,7 @@ var SocketCluster = require('socketcluster');
 var workerControllerPath = argv.wc || process.env.SOCKETCLUSTER_WORKER_CONTROLLER;
 var brokerControllerPath = argv.bc || process.env.SOCKETCLUSTER_BROKER_CONTROLLER;
 var workerClusterControllerPath = argv.wcc || process.env.SOCKETCLUSTER_WORKERCLUSTER_CONTROLLER;
-var environment = process.env.ENV || 'dev';
+var environment = process.env.ENV || 'prod';
 
 var options = {
   workers: Number(argv.w) || Number(process.env.SOCKETCLUSTER_WORKERS) || 1,
@@ -45,6 +45,7 @@ var options = {
   crashWorkerOnError: argv['auto-reboot'] != false,
   // If using nodemon, set this to true, and make sure that environment is 'dev'.
   killMasterOnSignal: false,
+  logLevel: 1,
   environment: environment,
   brokerOptions: {
       host: '127.0.0.1',
