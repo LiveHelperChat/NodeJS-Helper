@@ -13,6 +13,24 @@ gulp.task('js-nodejshelper', function() {
 	.pipe(gulp.dest('design/nodejshelpertheme/js'));
 });
 
-gulp.task('default', ['js-nodejshelper'], function() {
-	// Just execute all the tasks	
+gulp.task('js-nodejshelper-widget', function() {
+	var stylePath = ['design/nodejshelpertheme/js/socketcluster.js',
+	                 'design/nodejshelpertheme/js/customjs-widget.js'];
+	return gulp.src(stylePath)
+	.pipe(concat('nodejshelper.widget.min.js'))
+	.pipe(uglify({preserveComments: 'some'}))
+	.pipe(gulp.dest('design/nodejshelpertheme/js'));
 });
+
+gulp.task('js-nodejshelper-admin', function() {
+	var stylePath = ['design/nodejshelpertheme/js/socketcluster.js',
+	                 'design/nodejshelpertheme/js/customjs-admin.js'];
+	return gulp.src(stylePath)
+	.pipe(concat('nodejshelper.admin.min.js'))
+	.pipe(uglify({preserveComments: 'some'}))
+	.pipe(gulp.dest('design/nodejshelpertheme/js'));
+});
+
+gulp.task('default', gulp.series('js-nodejshelper','js-nodejshelper-widget','js-nodejshelper-admin', function() {
+    // Just execute all the tasks
+}));

@@ -2,3 +2,4 @@ node_modules
 serversc/lhc/node_modules
 serversc/lhc/node_modules
 settings/settings.ini.php
+package-lock.json
