@@ -23,23 +23,27 @@ var channelList = [];
     });
 
     function addChatToNodeJS(chat_id) {
-        if (typeof channelList[chat_id] === 'undefined')
-        {
-            channelList[chat_id] = socket.subscribe('chat_' + chat_id);
+        try {
+            if (typeof channelList[chat_id] === 'undefined')
+            {
+                channelList[chat_id] = socket.subscribe('chat_' + chat_id);
 
-            channelList[chat_id].on('subscribeFail', function (err) {
-                console.error('Failed to subscribe to the sample channel due to error: ' + err);
-            });
+                channelList[chat_id].on('subscribeFail', function (err) {
+                    console.error('Failed to subscribe to the sample channel due to error: ' + err);
+                });
 
-            var typingIndicator = $('#user-is-typing-'+chat_id);
+                var typingIndicator = $('#user-is-typing-'+chat_id);
 
-            channelList[chat_id].watch(function (op) {
-                if (op.op == 'vt') { // Visitor typing text
-                    typingIndicator.text(op.msg).css('visibility','visible');
-                } else if (op.op == 'vts') { // Visitor typing stopped
-                    typingIndicator.text(op.msg).css('visibility','hidden');
-                }
-            });
+                channelList[chat_id].watch(function (op) {
+                    if (op.op == 'vt') { // Visitor typing text
+                        typingIndicator.text(op.msg).css('visibility','visible');
+                    } else if (op.op == 'vts') { // Visitor typing stopped
+                        typingIndicator.text(op.msg).css('visibility','hidden');
+                    }
+                });
+            }
+        } catch (e) {
+            console.log(e);
         }
     }
 
@@ -50,33 +54,52 @@ var channelList = [];
     }
 
     function removeSynchroChatListener(chat_id) {
-        channelList[chat_id].destroy();
-        delete channelList[chat_id];
+        try {
+            if (typeof channelList[chat_id] !== 'undefined') {
+                channelList[chat_id].destroy();
+                delete channelList[chat_id];
+            }
+        } catch (e) {
+            console.log(e);
+        }
     }
 
     socket.on('close', function() {
-        lhinst.nodeJsMode = false;
-        channelList.forEach(function(channel){
-             channel.destroy();
-        });
-        channelList = [];
+        try {
 
-        ee.removeListener('chatTabLoaded', addChatToNodeJS);
-        ee.removeListener('operatorTyping', operatorTypingListener);
-        ee.removeListener('removeSynchroChat', removeSynchroChatListener);
+            lhinst.nodeJsMode = false;
+            channelList.forEach(function(channel){
+                 if (typeof channel !== 'undefined') {
+                    channel.destroy();
+                 }
+            });
+
+            channelList = [];
+
+            ee.removeListener('chatTabLoaded', addChatToNodeJS);
+            ee.removeListener('operatorTyping', operatorTypingListener);
+            ee.removeListener('removeSynchroChat', removeSynchroChatListener);
+
+        } catch (e) {
+            console.log(e);
+        }
     });
 
     socket.on('connect', function () {
 
-        lhinst.nodeJsMode = true;
+        try {
+            lhinst.nodeJsMode = true;
 
-        lhinst.chatsSynchronising.forEach(function (chat_id) {
-            addChatToNodeJS(chat_id);
-        });
-        
-        ee.addListener('chatTabLoaded', addChatToNodeJS);
-        ee.addListener('operatorTyping', operatorTypingListener);
-        ee.addListener('removeSynchroChat', removeSynchroChatListener);
+            lhinst.chatsSynchronising.forEach(function (chat_id) {
+                addChatToNodeJS(chat_id);
+            });
+
+            ee.addListener('chatTabLoaded', addChatToNodeJS);
+            ee.addListener('operatorTyping', operatorTypingListener);
+            ee.addListener('removeSynchroChat', removeSynchroChatListener);
+        } catch (e) {
+            console.log(e);
+        }
     });
 
 })();
