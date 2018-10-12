@@ -35,9 +35,9 @@ var channelList = [];
 
             channelList[chat_id].watch(function (op) {
                 if (op.op == 'vt') { // Visitor typing text
-                    typingIndicator.html(op.msg).css('visibility','visible');
+                    typingIndicator.text(op.msg).css('visibility','visible');
                 } else if (op.op == 'vts') { // Visitor typing stopped
-                    typingIndicator.html(op.msg).css('visibility','hidden');
+                    typingIndicator.text(op.msg).css('visibility','hidden');
                 }
             });
         }
