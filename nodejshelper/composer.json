@@ -1,0 +1,24 @@
+{
+    "name": "livehelperchat/nodejs",
+    "version": "1.0",
+    "description": "NodeJS support for Live Helper Chat",
+    "type": "project",
+    "homepage": "http://ivehelperchat.com",
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "Live helper Chat",
+            "homepage": "http://ivehelperchat.com"
+        }
+    ],
+    "support": {
+        "email": "remdex@mgmail.com"      
+    },
+    "require": {       
+        "colinmollenhour/credis": "dev-master#215d287d49c4f2d97d6711e241e6478363cdf67a"
+    },
+    "minimum-stability": "dev",       
+    "config": {
+        "vendor-dir": "vendor"
+    }
+}

@@ -12,6 +12,16 @@ class erLhcoreClassExtensionNodejshelper {
 
         $dispatcher = erLhcoreClassChatEventDispatcher::getInstance();
         $dispatcher->listen('onlineuser.proactive_send_invitation',array($this,'proactiveInvitationSend'));
+
+        $dispatcher->listen('chat.messages_added_fb', array($this,'messageReceived'));
+        $dispatcher->listen('chat.addmsguser', array( $this, 'messageReceived' ));
+        $dispatcher->listen('telegram.msg_received', array( $this, 'messageReceived' ));
+        $dispatcher->listen('twilio.sms_received', array( $this,'messageReceived' ));
+        $dispatcher->listen('chat.web_add_msg_admin', array( $this,'messageReceived' ));
+
+        // Chat was accepted.
+        $dispatcher->listen('chat.accept', array( $this,'statusChange' ));
+        $dispatcher->listen('chat.close', array( $this,'statusChange' ));
 	}
 
     public function __get($var)
@@ -59,6 +69,8 @@ class erLhcoreClassExtensionNodejshelper {
 
     public function registerAutoload()
     {
+        include 'extension/nodejshelper/vendor/autoload.php';
+        
         spl_autoload_register(array(
             $this,
             'autoload'
@@ -81,6 +93,18 @@ class erLhcoreClassExtensionNodejshelper {
         erLhcoreClassNodeJSRedis::instance()->publish('uo_' . $params['ou']->vid,'o:' . json_encode(array('op' => 'check_message')));
         //erLhcoreClassNodeJSRedis::instance()->publish('sample','o:' . json_encode(array('op' => 'check_message')));
     }
+    
+	public function messageReceived($params)
+    {
+        erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('op' => 'cmsg')));
+    }
+
+	public function statusChange($params)
+    {
+        erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('op' => 'schange')));
+    }
+
+
 }
 
 

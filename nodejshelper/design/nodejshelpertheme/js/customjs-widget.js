@@ -41,6 +41,8 @@
 
         ee.removeListener('visitorTyping', visitorTypingListener);
         ee.removeListener('visitorTypingStopped', visitorTypingStoppedListener);
+
+        confLH.chat_message_sinterval = confLH.defaut_chat_message_sinterval;
     });
 
     socket.on('connect', function () {
@@ -61,6 +63,11 @@
                     } else {
                         instStatus.css('visibility','hidden');
                     }
+                } else if (op.op == 'cmsg') {
+                    lhinst.syncusercall();
+                } else if (op.op == 'schange') {
+                    lhinst.chatsyncuserpending();
+                    lhinst.syncusercall();
                 }
             });
 
@@ -69,6 +76,9 @@
 
             ee.addListener('visitorTyping', visitorTypingListener);
             ee.addListener('visitorTypingStopped', visitorTypingStoppedListener);
+
+            // Make larger sync interval
+            confLH.chat_message_sinterval = 15000;
         };
     });
 

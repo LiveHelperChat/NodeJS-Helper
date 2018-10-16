@@ -39,6 +39,8 @@ var channelList = [];
                         typingIndicator.text(op.msg).css('visibility','visible');
                     } else if (op.op == 'vts') { // Visitor typing stopped
                         typingIndicator.text(op.msg).css('visibility','hidden');
+                    } else if (op.op == 'cmsg') { // Visitor has send a message
+                        lhinst.syncadmincall();
                     }
                 });
             }
@@ -80,6 +82,8 @@ var channelList = [];
             ee.removeListener('operatorTyping', operatorTypingListener);
             ee.removeListener('removeSynchroChat', removeSynchroChatListener);
 
+            confLH.chat_message_sinterval = confLH.defaut_chat_message_sinterval;
+
         } catch (e) {
             console.log(e);
         }
@@ -97,6 +101,8 @@ var channelList = [];
             ee.addListener('chatTabLoaded', addChatToNodeJS);
             ee.addListener('operatorTyping', operatorTypingListener);
             ee.addListener('removeSynchroChat', removeSynchroChatListener);
+            
+            confLH.chat_message_sinterval = 15000;
         } catch (e) {
             console.log(e);
         }

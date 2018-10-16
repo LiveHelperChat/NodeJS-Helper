@@ -12,7 +12,7 @@
             'port':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('port')?>',
             'secure':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('secure')?>'
         };
-
+        confLH.defaut_chat_message_sinterval = confLH.chat_message_sinterval;
         <?php if (erLhcoreClassSystem::instance()->SiteAccess == 'site_admin' && erLhcoreClassUser::instance()->isLogged()) :
         $currentUser = erLhcoreClassUser::instance();
         $userData = $currentUser->getUserData(true); ?>

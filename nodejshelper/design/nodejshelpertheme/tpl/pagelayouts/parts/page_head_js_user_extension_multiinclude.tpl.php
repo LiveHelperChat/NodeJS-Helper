@@ -14,6 +14,7 @@ lh.nodejsHelperOptions = {
     'port':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('port')?>',
     'secure':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('secure')?>',
 };
+confLH.defaut_chat_message_sinterval = confLH.chat_message_sinterval;
 </script>
 <script src="<?php echo erLhcoreClassDesign::designJS('js/nodejshelper.widget.min.js');?>"></script>
 <?php endif; ?>
