@@ -108,4 +108,8 @@ var channelList = [];
         }
     });
 
+    $(window).on('beforeunload', function () {
+        socket.destroy();
+    });
+
 })();

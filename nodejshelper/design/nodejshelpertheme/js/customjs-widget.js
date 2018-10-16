@@ -82,6 +82,9 @@
         };
     });
 
+    $(window).on('beforeunload', function () {
+        socket.destroy();
+    });
 
 
 })();
