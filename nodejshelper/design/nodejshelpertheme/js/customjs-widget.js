@@ -1,4 +1,4 @@
-(function() {
+setTimeout(function() {
 
     var socketOptions = {
         hostname: lh.nodejsHelperOptions.hostname,
@@ -78,13 +78,15 @@
             ee.addListener('visitorTypingStopped', visitorTypingStoppedListener);
 
             // Make larger sync interval
-            confLH.chat_message_sinterval = 15000;
-        };
+            confLH.chat_message_sinterval = 10000;
+
+            // Force one time check
+            lhinst.syncusercall();
+        }
     });
 
     $(window).on('beforeunload', function () {
         socket.destroy();
     });
 
-
-})();
+},1000);

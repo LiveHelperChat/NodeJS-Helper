@@ -22,6 +22,7 @@ class erLhcoreClassExtensionNodejshelper {
         // Chat was accepted.
         $dispatcher->listen('chat.accept', array( $this,'statusChange' ));
         $dispatcher->listen('chat.close', array( $this,'statusChange' ));
+        $dispatcher->listen('chat.genericbot_chat_command_transfer', array( $this,'statusChange' ));
 	}
 
     public function __get($var)
