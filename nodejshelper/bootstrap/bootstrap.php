@@ -17,7 +17,12 @@ class erLhcoreClassExtensionNodejshelper {
         $dispatcher->listen('chat.addmsguser', array( $this, 'messageReceived' ));
         $dispatcher->listen('telegram.msg_received', array( $this, 'messageReceived' ));
         $dispatcher->listen('twilio.sms_received', array( $this,'messageReceived' ));
-        $dispatcher->listen('chat.web_add_msg_admin', array( $this,'messageReceived' ));
+
+        $dispatcher->listen('chat.visitor_regular_closed', array( $this,'messageReceived' ));
+        $dispatcher->listen('chat.explicitly_closed', array( $this,'messageReceived' ));
+
+        $dispatcher->listen('chat.web_add_msg_admin', array( $this,'messageReceivedAdmin' ));
+        $dispatcher->listen('chat.chatwidgetchat', array( $this,'messageReceived' ));
 
         // Chat was accepted.
         $dispatcher->listen('chat.accept', array( $this,'statusChange' ));
@@ -37,6 +42,14 @@ class erLhcoreClassExtensionNodejshelper {
             default:
                 ;
                 break;
+        }
+    }
+
+    public function messageReceivedAdmin($params) {
+	    if (isset($params['ou']) && $params['ou'] instanceof erLhcoreClassModelChatOnlineUser && $params['chat']->user_status == erLhcoreClassModelChat::USER_STATUS_PENDING_REOPEN) {
+            erLhcoreClassNodeJSRedis::instance()->publish('uo_' . $params['ou']->vid,'o:' . json_encode(array('op' => 'check_message')));
+        } else {
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('op' => 'cmsg')));
         }
     }
 
