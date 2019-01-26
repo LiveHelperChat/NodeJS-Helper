@@ -20,8 +20,11 @@ class erLhcoreClassExtensionNodejshelper {
 
         $dispatcher->listen('chat.visitor_regular_closed', array( $this,'messageReceived' ));
         $dispatcher->listen('chat.explicitly_closed', array( $this,'messageReceived' ));
+        $dispatcher->listen('chat.data_changed_chat', array( $this,'messageReceived' ));
+        $dispatcher->listen('chat.screenshot_ready', array( $this,'messageReceived' ));
 
         $dispatcher->listen('chat.web_add_msg_admin', array( $this,'messageReceivedAdmin' ));
+        $dispatcher->listen('chat.added_operation', array( $this,'messageReceivedAdmin' ));
         $dispatcher->listen('chat.chatwidgetchat', array( $this,'messageReceived' ));
 
         // Chat was accepted.
