@@ -24,12 +24,20 @@ setTimeout(function() {
 
     function visitorTypingListener(data)
     {
-        socket.publish('chat_'+lhinst.chat_id,{'op':'vt','msg':data.msg});
+        if(lh.nodejsHelperOptions.instance_id > 0){
+            socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id,{'op':'vt','msg':data.msg});
+        } else{
+            socket.publish('chat_'+lhinst.chat_id,{'op':'vt','msg':data.msg});
+        }
     }
 
     function visitorTypingStoppedListener()
     {
-        socket.publish('chat_'+lhinst.chat_id,{'op':'vts'});
+        if(lh.nodejsHelperOptions.instance_id > 0){
+            socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id,{'op':'vts'});
+        } else{
+            socket.publish('chat_'+lhinst.chat_id,{'op':'vts'});
+        }
     }
 
     socket.on('close', function(){
@@ -48,7 +56,11 @@ setTimeout(function() {
     socket.on('connect', function () {
 
         if (lhinst.chat_id > 0) {
-            sampleChannel = socket.subscribe('chat_' + lhinst.chat_id);
+            if(lh.nodejsHelperOptions.instance_id > 0){
+                sampleChannel = socket.subscribe('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
+            } else{
+                sampleChannel = socket.subscribe('chat_' + lhinst.chat_id);
+            }
 
             sampleChannel.on('subscribeFail', function (err) {
                 console.error('Failed to subscribe to the sample channel due to error: ' + err);

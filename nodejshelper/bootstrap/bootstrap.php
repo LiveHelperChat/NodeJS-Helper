@@ -76,6 +76,10 @@ class erLhcoreClassExtensionNodejshelper {
                 return $this->settings['public_settings']['secure'];
                 break;
 
+            case 'automated_hosting':
+                return $this->settings['automated_hosting'];
+                break;
+
             default:
                 return null;
                 ;

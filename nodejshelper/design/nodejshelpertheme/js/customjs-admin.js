@@ -26,7 +26,11 @@ var channelList = [];
         try {
             if (typeof channelList[chat_id] === 'undefined')
             {
-                channelList[chat_id] = socket.subscribe('chat_' + chat_id);
+                if(lh.nodejsHelperOptions.instance_id > 0){
+                    channelList[chat_id] = socket.subscribe('chat_'+lh.nodejsHelperOptions.instance_id+'_'+ chat_id);
+                } else{
+                    channelList[chat_id] = socket.subscribe('chat_' + chat_id);
+                }
 
                 channelList[chat_id].on('subscribeFail', function (err) {
                     console.error('Failed to subscribe to the sample channel due to error: ' + err);
