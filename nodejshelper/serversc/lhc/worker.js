@@ -4,6 +4,7 @@ var serveStatic = require('serve-static');
 var path = require('path');
 var morgan = require('morgan');
 var healthChecker = require('sc-framework-health-check');
+var crypto = require('crypto');
 
 class Worker extends SCWorker {
   run() {
@@ -34,6 +35,33 @@ class Worker extends SCWorker {
     */
     scServer.on('connection', function (socket) {
 
+      socket.on('login', function (token, respond) {
+        let buff = new Buffer(token.hash, 'base64');  
+        let hash = buff.toString('ascii');
+        var signatures = hash.split('.');
+            var SHA1 = function(input){
+              return crypto.createHash('sha1').update(input).digest('hex');
+            }
+            if(signatures[0] == 'visitor'){
+              var validateHash = 'visitor' + '.' + SHA1(signatures[2]) + '.' + signatures[2] + '.' + SHA1(signatures[2]);
+            } else if(signatures[0] == 'operator'){
+              var validateHash = 'operator' + '.' + SHA1(signatures[2]) + '.' + signatures[2] + '.' + SHA1(signatures[2]);
+            }
+            if(validateHash == hash){
+              var isValidLogin = true;
+            }
+          if (isValidLogin) {
+            respond();
+            var now = new Date (),
+                lifeTime = new Date ( now );
+                lifeTime.setMinutes ( now.getMinutes() + 30 );
+            socket.setAuthToken({token:token.hash, exp: lifeTime.getTime(), chanelName:token.chanelName});
+          } else {
+            // Passing string as first argument indicates error
+            respond('Login failed');
+          }
+        });
+
       // Some sample logic to show how to handle client events,
       // replace this with your own logic
 
@@ -52,6 +80,16 @@ class Worker extends SCWorker {
       socket.on('disconnect', function () {
         //clearInterval(interval);
       });
+    });
+
+    scServer.addMiddleware(scServer.MIDDLEWARE_PUBLISH_IN, function (req, next) {
+      var authToken = req.socket.authToken;
+
+      if (authToken && req.channel == authToken.chanelName) {
+        next();
+      } else {
+        next('You are not authorized to publish to ' + req.channel);
+      }
     });
   }
 }

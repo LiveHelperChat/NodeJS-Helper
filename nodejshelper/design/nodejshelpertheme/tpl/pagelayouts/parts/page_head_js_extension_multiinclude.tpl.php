@@ -13,6 +13,7 @@
             'secure':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('secure')?>',
             <?php if(erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')): ?>
             'instance_id':'<?php echo erLhcoreClassInstance::getInstance()->id?>',
+            'hash': '<?php echo base64_encode('operator'. '.' .sha1(erConfigClassLhConfig::getInstance()->getSetting('site','secrethash')).'.'.erConfigClassLhConfig::getInstance()->getSetting('site','secrethash').'.'.sha1(erConfigClassLhConfig::getInstance()->getSetting('site','secrethash')));?>',
             <?php endif;?>
         };
         confLH.defaut_chat_message_sinterval = confLH.chat_message_sinterval;

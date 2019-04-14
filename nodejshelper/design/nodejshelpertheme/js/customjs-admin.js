@@ -15,8 +15,16 @@ var channelList = [];
         socketOptions.secure = true;
     }
 
+    var chanelName;
+    if(lh.nodejsHelperOptions.instance_id > 0){
+            chanelName = ('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
+        } else{
+            chanelName = ('chat_'+lhinst.chat_id);
+        }
+    
     // Initiate the connection to the server
     var socket = socketCluster.connect(socketOptions);
+
 
     socket.on('error', function (err) {
         console.error(err);
@@ -31,12 +39,14 @@ var channelList = [];
                 } else{
                     channelList[chat_id] = socket.subscribe('chat_' + chat_id);
                 }
-
                 channelList[chat_id].on('subscribeFail', function (err) {
                     console.error('Failed to subscribe to the sample channel due to error: ' + err);
                 });
-
-                var typingIndicator = $('#user-is-typing-'+chat_id);
+                if(lh.nodejsHelperOptions.instance_id > 0){
+                    var typingIndicator = $('#user-is-typing-'+lh.nodejsHelperOptions.instance_id+'_'+chat_id);
+                } else{
+                    var typingIndicator = $('#user-is-typing-'+chat_id);
+                }
 
                 channelList[chat_id].watch(function (op) {
                     if (op.op == 'vt') { // Visitor typing text
@@ -56,7 +66,11 @@ var channelList = [];
     function operatorTypingListener(data) {
         data.ttx = lh.nodejsHelperOptions.typer;
         ee.emitEvent('nodeJsTypingOperator', [data]);
-        socket.publish('chat_'+data.chat_id,{'op':'ot','data':data}); // Operator typing
+        if(lh.nodejsHelperOptions.instance_id > 0){
+            socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+data.chat_id,{'op':'ot','data':data}); // Operator typing
+        } else{
+            socket.publish('chat_'+data.chat_id,{'op':'ot','data':data}); // Operator typing
+        }
     }
 
     function removeSynchroChatListener(chat_id) {
@@ -72,7 +86,6 @@ var channelList = [];
 
     socket.on('close', function() {
         try {
-
             lhinst.nodeJsMode = false;
             channelList.forEach(function(channel){
                  if (typeof channel !== 'undefined') {
@@ -93,12 +106,17 @@ var channelList = [];
         }
     });
 
-    socket.on('connect', function () {
+    socket.emit('login', {hash:lh.nodejsHelperOptions.hash, chanelName: chanelName}, function (err) {      
+        if (err) {
+            console.log(err);
+        }
+      });
 
+    socket.on('connect', function (status) {
+        if(status.isAuthenticated){
         try {
-            lhinst.nodeJsMode = true;
-
-            lhinst.chatsSynchronising.forEach(function (chat_id) {
+        lhinst.nodeJsMode = true;
+        lhinst.chatsSynchronising.forEach(function (chat_id) {
                 addChatToNodeJS(chat_id);
             });
 
@@ -110,7 +128,7 @@ var channelList = [];
         } catch (e) {
             console.log(e);
         }
-    });
+    }});
 
     $(window).on('beforeunload', function () {
         socket.destroy();

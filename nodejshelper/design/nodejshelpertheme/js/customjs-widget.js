@@ -13,8 +13,17 @@ setTimeout(function() {
         socketOptions.secure = true;
     }
 
+    var chanelName;
+    if(lh.nodejsHelperOptions.instance_id > 0){
+            chanelName = ('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
+        } else{
+            chanelName = ('chat_'+lhinst.chat_id);
+        }
+
+
     // Initiate the connection to the server
     var socket = socketCluster.connect(socketOptions);
+
 
     var sampleChannel = null;
 
@@ -52,16 +61,22 @@ setTimeout(function() {
 
         confLH.chat_message_sinterval = confLH.defaut_chat_message_sinterval;
     });
+      
+      socket.emit('login', {hash:lh.nodejsHelperOptions.hash, chanelName: chanelName}, function (err) {      
+        if (err) {
+            console.log(err);
+        }
+      });
 
-    socket.on('connect', function () {
-
+    socket.on('connect', function (status) {
+        if(status.isAuthenticated){
         if (lhinst.chat_id > 0) {
             if(lh.nodejsHelperOptions.instance_id > 0){
-                sampleChannel = socket.subscribe('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
+                    sampleChannel = socket.subscribe('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
+
             } else{
                 sampleChannel = socket.subscribe('chat_' + lhinst.chat_id);
             }
-
             sampleChannel.on('subscribeFail', function (err) {
                 console.error('Failed to subscribe to the sample channel due to error: ' + err);
             });
@@ -95,6 +110,7 @@ setTimeout(function() {
             // Force one time check
             lhinst.syncusercall();
         }
+    }
     });
 
     $(window).on('beforeunload', function () {
