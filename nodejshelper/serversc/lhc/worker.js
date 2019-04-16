@@ -11,6 +11,8 @@ class Worker extends SCWorker {
     console.log('   >> Worker PID:', process.pid);
     var environment = this.options.environment;
 
+    var secretHash = this.options.secretHash;
+
     var app = express();
 
     var httpServer = this.httpServer;
@@ -36,29 +38,20 @@ class Worker extends SCWorker {
     scServer.on('connection', function (socket) {
 
       socket.on('login', function (token, respond) {
-        let buff = new Buffer(token.hash, 'base64');  
-        let hash = buff.toString('ascii');
-        var signatures = hash.split('.');
+        var tokenParts = token.hash.split('.');
             var SHA1 = function(input){
               return crypto.createHash('sha1').update(input).digest('hex');
             }
-            if(signatures[0] == 'visitor'){
-              var validateHash = 'visitor' + '.' + SHA1(signatures[2]) + '.' + signatures[2] + '.' + SHA1(signatures[2]);
-            } else if(signatures[0] == 'operator'){
-              var validateHash = 'operator' + '.' + SHA1(signatures[2]) + '.' + signatures[2] + '.' + SHA1(signatures[2]);
+            var secNow = Math.round(Date.now()/1000);
+            if(tokenParts[1]){
+              var validateVisitorHash = SHA1(tokenParts[1] + 'Visitor' + secretHash);
+              var validateOperatorHash = SHA1(tokenParts[1] + 'Operator' + secretHash); 
             }
-            if(validateHash == hash){
-              var isValidLogin = true;
-            }
-          if (isValidLogin) {
-            respond();
-            var now = new Date (),
-                lifeTime = new Date ( now );
-                lifeTime.setMinutes ( now.getMinutes() + 30 );
-            socket.setAuthToken({token:token.hash, exp: lifeTime.getTime(), chanelName:token.chanelName});
-          } else {
-            // Passing string as first argument indicates error
-            respond('Login failed');
+            if((tokenParts[0] == validateVisitorHash) || (tokenParts[0] == validateOperatorHash) ){
+              respond();
+              socket.setAuthToken({token:token.hash, exp: (secNow + 60*30), chanelName:token.chanelName});
+            } else {
+              respond('Login failed');
           }
         });
 

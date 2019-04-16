@@ -11,9 +11,12 @@
             'path':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('path')?>',
             'port':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('port')?>',
             'secure':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('secure')?>',
+            'hash': '<?php 
+                    $date = time();
+                    echo sha1($date . 'Operator' . erConfigClassLhConfig::getInstance()->getSetting('site','secrethash')) . '.' . $date;
+                    ?>',
             <?php if(erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')): ?>
             'instance_id':'<?php echo erLhcoreClassInstance::getInstance()->id?>',
-            'hash': '<?php echo base64_encode('operator'. '.' .sha1(erConfigClassLhConfig::getInstance()->getSetting('site','secrethash')).'.'.erConfigClassLhConfig::getInstance()->getSetting('site','secrethash').'.'.sha1(erConfigClassLhConfig::getInstance()->getSetting('site','secrethash')));?>',
             <?php endif;?>
         };
         confLH.defaut_chat_message_sinterval = confLH.chat_message_sinterval;
