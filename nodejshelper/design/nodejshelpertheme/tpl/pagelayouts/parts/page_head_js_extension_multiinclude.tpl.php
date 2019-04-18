@@ -15,9 +15,11 @@
                     $date = time();
                     echo sha1($date . 'Operator' . erConfigClassLhConfig::getInstance()->getSetting('site','secrethash')) . '.' . $date;
                     ?>',
-            <?php if(erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')): ?>
+            <?php if(erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')){ ?>    
             'instance_id':'<?php echo erLhcoreClassInstance::getInstance()->id?>',
-            <?php endif;?>
+            <?php } else { ?>
+            'instance_id':'0',
+            <?php } ?>
         };
         confLH.defaut_chat_message_sinterval = confLH.chat_message_sinterval;
         <?php if (erLhcoreClassSystem::instance()->SiteAccess == 'site_admin' && erLhcoreClassUser::instance()->isLogged()) :

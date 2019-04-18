@@ -39,20 +39,25 @@ class Worker extends SCWorker {
 
       socket.on('login', function (token, respond) {
         var tokenParts = token.hash.split('.');
-            var SHA1 = function(input){
-              return crypto.createHash('sha1').update(input).digest('hex');
-            }
-            var secNow = Math.round(Date.now()/1000);
-            if(tokenParts[1]){
-              var validateVisitorHash = SHA1(tokenParts[1] + 'Visitor' + secretHash);
-              var validateOperatorHash = SHA1(tokenParts[1] + 'Operator' + secretHash); 
-            }
-            if((tokenParts[0] == validateVisitorHash) || (tokenParts[0] == validateOperatorHash) ){
-              respond();
-              socket.setAuthToken({token:token.hash, exp: (secNow + 60*30), chanelName:token.chanelName});
-            } else {
-              respond('Login failed');
+        var secNow = Math.round(Date.now()/1000);
+        if(tokenParts[1] > (secNow - 60*60)){
+          var SHA1 = function(input){
+            return crypto.createHash('sha1').update(input).digest('hex');
           }
+          if(tokenParts[1]){
+            var validateVisitorHash = SHA1(tokenParts[1] + 'Visitor' + secretHash);
+            var validateOperatorHash = SHA1(tokenParts[1] + 'Operator' + secretHash); 
+          }
+          if((tokenParts[0] == validateVisitorHash) || (tokenParts[0] == validateOperatorHash)){
+            respond();
+            socket.setAuthToken({token:token.hash, exp: (secNow + 60*30), chanelName:token.chanelName});
+          } else {
+            // Passing string as first argument indicates error
+            respond('Login failed');
+          }
+        } else{
+          respond('Login failed');
+        }
         });
 
       // Some sample logic to show how to handle client events,
