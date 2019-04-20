@@ -10,9 +10,8 @@ lh_inst.nodejsHelperOptions = {
     'path':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('path')?>',
     'port':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('port')?>',
     'secure':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('secure')?>',
-    <?php if(erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')): ?>    
-    'instance_id':'<?php echo erLhcoreClassInstance::getInstance()->id?>',
-    <?php endif; ?>
+    'instance_id':<?php if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) : ?><?php echo erLhcoreClassInstance::getInstance()->id?><?php else : ?>0<?php endif; ?>,
+    'hash': '<?php $date = time(); echo sha1($date . 'Operator' . erConfigClassLhConfig::getInstance()->getSetting('site','secrethash')) . '.' . $date;?>'
 };
 
 var thnjs = document.getElementsByTagName('head')[0];

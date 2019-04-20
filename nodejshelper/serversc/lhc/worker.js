@@ -30,8 +30,6 @@ class Worker extends SCWorker {
 
     httpServer.on('request', app);
 
-    //var count = 0;
-
     /*
       In here we handle our incoming realtime connections and listen for events.
     */
@@ -40,45 +38,47 @@ class Worker extends SCWorker {
       socket.on('login', function (token, respond) {
         var tokenParts = token.hash.split('.');
         var secNow = Math.round(Date.now()/1000);
-        if(tokenParts[1] > (secNow - 60*60)){
-          var SHA1 = function(input){
-            return crypto.createHash('sha1').update(input).digest('hex');
-          }
-          if(tokenParts[1]){
-            var validateVisitorHash = SHA1(tokenParts[1] + 'Visitor' + secretHash);
-            var validateOperatorHash = SHA1(tokenParts[1] + 'Operator' + secretHash); 
-          }
-          if((tokenParts[0] == validateVisitorHash) || (tokenParts[0] == validateOperatorHash)){
-            respond();
-            socket.setAuthToken({token:token.hash, exp: (secNow + 60*30), chanelName:token.chanelName});
-          } else {
-            // Passing string as first argument indicates error
+
+        if (tokenParts[1] > (secNow - 60*60)) {
+            var SHA1 = function(input){
+                return crypto.createHash('sha1').update(input).digest('hex');
+            }
+
+            if (tokenParts[1]) {
+                var validateVisitorHash = SHA1(tokenParts[1] + 'Visitor' + secretHash);
+                var validateOperatorHash = SHA1(tokenParts[1] + 'Operator' + secretHash);
+            }
+
+            if ((tokenParts[0] == validateVisitorHash) || (tokenParts[0] == validateOperatorHash)) {
+                respond();
+                socket.setAuthToken({token:token.hash, exp: (secNow + 60*30), chanelName:token.chanelName});
+            } else {
+                // Passing string as first argument indicates error
+                respond('Login failed');
+            }
+
+        } else {
             respond('Login failed');
-          }
-        } else{
-          respond('Login failed');
         }
-        });
 
-      // Some sample logic to show how to handle client events,
-      // replace this with your own logic
 
-      /*socket.on('sampleClientEvent', function (data) {
-        count++;
-        console.log('Handled sampleClientEvent', data);
-        scServer.exchange.publish('sample', count);
-      });*/
-
-      /*var interval = setInterval(function () {
-        socket.emit('random', {
-          number: Math.floor(Math.random() * 5)
-        });
-      }, 1000);*/
+      });
 
       socket.on('disconnect', function () {
         //clearInterval(interval);
       });
     });
+
+      scServer.addMiddleware(scServer.MIDDLEWARE_SUBSCRIBE,
+          function (req, next) {
+              var authToken = req.socket.authToken;
+              if (authToken) {
+                  next(); // Allow
+              } else {
+                  next('You are not authorized to subscribe to ' + req.channel); // Block
+              }
+          }
+      );
 
     scServer.addMiddleware(scServer.MIDDLEWARE_PUBLISH_IN, function (req, next) {
       var authToken = req.socket.authToken;

@@ -14,16 +14,15 @@ setTimeout(function() {
     }
 
     var chanelName;
-    if(lh.nodejsHelperOptions.instance_id > 0){
-            chanelName = ('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
-        } else{
-            chanelName = ('chat_'+lhinst.chat_id);
-        }
 
+    if (lh.nodejsHelperOptions.instance_id > 0) {
+        chanelName = ('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
+    } else{
+        chanelName = ('chat_'+lhinst.chat_id);
+    }
 
     // Initiate the connection to the server
     var socket = socketCluster.connect(socketOptions);
-
 
     var sampleChannel = null;
 
@@ -33,18 +32,18 @@ setTimeout(function() {
 
     function visitorTypingListener(data)
     {
-        if(lh.nodejsHelperOptions.instance_id > 0){
+        if (lh.nodejsHelperOptions.instance_id > 0) {
             socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id,{'op':'vt','msg':data.msg});
-        } else{
+        } else {
             socket.publish('chat_'+lhinst.chat_id,{'op':'vt','msg':data.msg});
         }
     }
 
     function visitorTypingStoppedListener()
     {
-        if(lh.nodejsHelperOptions.instance_id > 0){
+        if (lh.nodejsHelperOptions.instance_id > 0) {
             socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id,{'op':'vts'});
-        } else{
+        } else {
             socket.publish('chat_'+lhinst.chat_id,{'op':'vts'});
         }
     }
@@ -61,56 +60,60 @@ setTimeout(function() {
 
         confLH.chat_message_sinterval = confLH.defaut_chat_message_sinterval;
     });
-      
-      socket.emit('login', {hash:lh.nodejsHelperOptions.hash, chanelName: chanelName}, function (err) {      
-        if (err) {
-            console.log(err);
+
+    function connectVisitor(){
+        if (lh.nodejsHelperOptions.instance_id > 0) {
+            sampleChannel = socket.subscribe('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
+        } else {
+            sampleChannel = socket.subscribe('chat_' + lhinst.chat_id);
         }
-      });
+
+        sampleChannel.on('subscribeFail', function (err) {
+            console.error('Failed to subscribe to the sample channel due to error: ' + err);
+        });
+
+        sampleChannel.watch(function (op) {
+            if (op.op == 'ot') { // Operator Typing Message
+                var instStatus = $('#id-operator-typing');
+                if (op.data.status == true) {
+                    instStatus.text(op.data.ttx);
+                    instStatus.css('visibility','visible');
+                } else {
+                    instStatus.css('visibility','hidden');
+                }
+            } else if (op.op == 'cmsg') {
+                lhinst.syncusercall();
+            } else if (op.op == 'schange') {
+                lhinst.chatsyncuserpending();
+                lhinst.syncusercall();
+            }
+        });
+
+        // Disable default method
+        LHCCallbacks.initTypingMonitoringUserInform = true;
+
+        ee.addListener('visitorTyping', visitorTypingListener);
+        ee.addListener('visitorTypingStopped', visitorTypingStoppedListener);
+
+        // Make larger sync interval
+        confLH.chat_message_sinterval = 10000;
+
+        // Force one time check
+        lhinst.syncusercall();
+    }
 
     socket.on('connect', function (status) {
-        if(status.isAuthenticated){
-        if (lhinst.chat_id > 0) {
-            if(lh.nodejsHelperOptions.instance_id > 0){
-                    sampleChannel = socket.subscribe('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
-
-            } else{
-                sampleChannel = socket.subscribe('chat_' + lhinst.chat_id);
-            }
-            sampleChannel.on('subscribeFail', function (err) {
-                console.error('Failed to subscribe to the sample channel due to error: ' + err);
-            });
-
-            sampleChannel.watch(function (op) {
-                if (op.op == 'ot') { // Operator Typing Message
-                    var instStatus = $('#id-operator-typing');
-                    if (op.data.status == true) {
-                        instStatus.text(op.data.ttx);
-                        instStatus.css('visibility','visible');
-                    } else {
-                        instStatus.css('visibility','hidden');
-                    }
-                } else if (op.op == 'cmsg') {
-                    lhinst.syncusercall();
-                } else if (op.op == 'schange') {
-                    lhinst.chatsyncuserpending();
-                    lhinst.syncusercall();
+        if (status.isAuthenticated && lhinst.chat_id > 0) {
+            connectVisitor();
+        } else {
+            socket.emit('login', {hash:lh.nodejsHelperOptions.hash, chanelName: chanelName}, function (err) {
+                if (err) {
+                    console.log(err);
+                } else {
+                    connectVisitor();
                 }
             });
-
-            // Disable default method
-            LHCCallbacks.initTypingMonitoringUserInform = true;
-
-            ee.addListener('visitorTyping', visitorTypingListener);
-            ee.addListener('visitorTypingStopped', visitorTypingStoppedListener);
-
-            // Make larger sync interval
-            confLH.chat_message_sinterval = 10000;
-
-            // Force one time check
-            lhinst.syncusercall();
         }
-    }
     });
 
     $(window).on('beforeunload', function () {

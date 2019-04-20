@@ -51,7 +51,7 @@ var options = {
       host: '127.0.0.1',
       port: 6379
   },
-  secretHash:'45cdd9f682' || null, //This secrethash of lhc settings, need for user authenticated
+  secretHash: 'e9e931a171', //This secrethash of lhc settings, need for user authenticated
 };
 
 var bootTimeout = Number(process.env.SOCKETCLUSTER_CONTROLLER_BOOT_TIMEOUT) || 10000;
