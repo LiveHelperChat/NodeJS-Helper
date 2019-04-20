@@ -32,15 +32,17 @@ var channelList = [];
                     console.error('Failed to subscribe to the sample channel due to error: ' + err);
                 });
 
-                var typingIndicator = $('#user-is-typing-'+chat_id);
-
                 channelList[chat_id].watch(function (op) {
+
+                    var typingIndicator = $('#user-is-typing-'+chat_id);
+
                     if (op.op == 'vt') { // Visitor typing text
                         typingIndicator.text(op.msg).css('visibility','visible');
                     } else if (op.op == 'vts') { // Visitor typing stopped
                         typingIndicator.text(op.msg).css('visibility','hidden');
                     } else if (op.op == 'cmsg') { // Visitor has send a message
-                        lhinst.syncadmincall();
+                        var lhcController = angular.element('body').scope();
+                        lhcController.loadchatMessagesScope();
                     }
                 });
             }
@@ -79,6 +81,7 @@ var channelList = [];
             channelList = [];
 
             ee.removeListener('chatTabLoaded', addChatToNodeJS);
+            ee.removeListener('chatTabMonitor', addChatToNodeJS);
             ee.removeListener('operatorTyping', operatorTypingListener);
             ee.removeListener('removeSynchroChat', removeSynchroChatListener);
 
@@ -98,11 +101,12 @@ var channelList = [];
                 addChatToNodeJS(chat_id);
             });
 
+            ee.addListener('chatTabMonitor', addChatToNodeJS);
             ee.addListener('chatTabLoaded', addChatToNodeJS);
             ee.addListener('operatorTyping', operatorTypingListener);
             ee.addListener('removeSynchroChat', removeSynchroChatListener);
             
-            confLH.chat_message_sinterval = 15000;
+            confLH.chat_message_sinterval = 5000;
         } catch (e) {
             console.log(e);
         }
