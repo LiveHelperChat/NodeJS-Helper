@@ -82,8 +82,7 @@ class Worker extends SCWorker {
 
     scServer.addMiddleware(scServer.MIDDLEWARE_PUBLISH_IN, function (req, next) {
       var authToken = req.socket.authToken;
-
-      if (authToken && req.channel == authToken.chanelName) {
+      if (authToken) {
         next();
       } else {
         next('You are not authorized to publish to ' + req.channel);
