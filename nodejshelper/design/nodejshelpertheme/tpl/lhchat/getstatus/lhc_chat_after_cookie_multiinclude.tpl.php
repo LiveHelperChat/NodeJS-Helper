@@ -10,9 +10,15 @@ lh_inst.nodejsHelperOptions = {
     'path':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('path')?>',
     'port':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('port')?>',
     'secure':'<?php echo erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('secure')?>',
-    <?php if(erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')): ?>    
-    'instance_id':'<?php echo erLhcoreClassInstance::getInstance()->id?>',
-    <?php endif; ?>
+    'hash': '<?php 
+            $date = time();
+            echo sha1($date . 'Custom' . erConfigClassLhConfig::getInstance()->getSetting('site','secrethash')) . '.' . $date;
+            ?>',
+        <?php if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) { ?>    
+        'instance_id':'<?php echo erLhcoreClassInstance::getInstance()->id?>',
+        <?php } else { ?>
+        'instance_id':'0',
+        <?php } ?>
 };
 
 var thnjs = document.getElementsByTagName('head')[0];

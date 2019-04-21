@@ -14,16 +14,14 @@ setTimeout(function() {
     }
 
     var chanelName;
-    if(lh.nodejsHelperOptions.instance_id > 0){
+    if (lh.nodejsHelperOptions.instance_id > 0) {
             chanelName = ('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
-        } else{
+        } else {
             chanelName = ('chat_'+lhinst.chat_id);
         }
 
-
     // Initiate the connection to the server
     var socket = socketCluster.connect(socketOptions);
-
 
     var sampleChannel = null;
 
@@ -33,23 +31,23 @@ setTimeout(function() {
 
     function visitorTypingListener(data)
     {
-        if(lh.nodejsHelperOptions.instance_id > 0){
+        if (lh.nodejsHelperOptions.instance_id > 0) {
             socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id,{'op':'vt','msg':data.msg});
-        } else{
+        } else {
             socket.publish('chat_'+lhinst.chat_id,{'op':'vt','msg':data.msg});
         }
     }
 
     function visitorTypingStoppedListener()
     {
-        if(lh.nodejsHelperOptions.instance_id > 0){
+        if (lh.nodejsHelperOptions.instance_id > 0) {
             socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id,{'op':'vts'});
-        } else{
+        } else {
             socket.publish('chat_'+lhinst.chat_id,{'op':'vts'});
         }
     }
 
-    socket.on('close', function(){
+    socket.on('close', function() {
         LHCCallbacks.initTypingMonitoringUserInform = false;
 
         if (sampleChannel !== null) {
@@ -61,20 +59,19 @@ setTimeout(function() {
 
         confLH.chat_message_sinterval = confLH.defaut_chat_message_sinterval;
     });
-      
-      socket.emit('login', {hash:lh.nodejsHelperOptions.hash, chanelName: chanelName}, function (err) {      
-        if (err) {
-            console.log(err);
+
+    socket.on('connect', function () {
+        if (socket.authState == 'unauthenticated') {
+            socket.emit('login', {hash: lh.nodejsHelperOptions.hash, chanelName: chanelName}, function (err) {      
+                if (err) {
+                    console.log(err);
+                }
+              });
         }
-      });
-
-    socket.on('connect', function (status) {
-        if(status.isAuthenticated){
         if (lhinst.chat_id > 0) {
-            if(lh.nodejsHelperOptions.instance_id > 0){
+            if (lh.nodejsHelperOptions.instance_id > 0) {
                     sampleChannel = socket.subscribe('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
-
-            } else{
+            } else {
                 sampleChannel = socket.subscribe('chat_' + lhinst.chat_id);
             }
             sampleChannel.on('subscribeFail', function (err) {
@@ -110,7 +107,6 @@ setTimeout(function() {
             // Force one time check
             lhinst.syncusercall();
         }
-    }
     });
 
     $(window).on('beforeunload', function () {

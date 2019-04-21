@@ -20,8 +20,16 @@
 		console.error(err);
 	});
 
-	socket.on('connect', function () {
-		//console.log('Socket is connected');
+
+
+	socket.on('connect', function (status) {
+		if(socket.authState == 'unauthenticated') {
+			socket.emit('login', {hash: lh_inst.nodejsHelperOptions.hash}, function (err) {      
+				if (err) {
+					console.log(err);
+				}
+			});
+		}
 	});
 
 	var sampleChannel = socket.subscribe('uo_' + lh_inst.cookieDataPers.vid);

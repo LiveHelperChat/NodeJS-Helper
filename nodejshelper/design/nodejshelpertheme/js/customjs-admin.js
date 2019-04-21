@@ -14,13 +14,6 @@ var channelList = [];
     if (lh.nodejsHelperOptions.secure == 1) {
         socketOptions.secure = true;
     }
-
-    var chanelName;
-    if(lh.nodejsHelperOptions.instance_id > 0){
-            chanelName = ('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
-        } else{
-            chanelName = ('chat_'+lhinst.chat_id);
-        }
     
     // Initiate the connection to the server
     var socket = socketCluster.connect(socketOptions);
@@ -34,19 +27,16 @@ var channelList = [];
         try {
             if (typeof channelList[chat_id] === 'undefined')
             {
-                if(lh.nodejsHelperOptions.instance_id > 0){
+                if (lh.nodejsHelperOptions.instance_id > 0) {
                     channelList[chat_id] = socket.subscribe('chat_'+lh.nodejsHelperOptions.instance_id+'_'+ chat_id);
-                } else{
-                    channelList[chat_id] = socket.subscribe('chat_' + chat_id);
+                } else {
+                    channelList[chat_id] = socket.subscribe('chat_'+chat_id);
                 }
                 channelList[chat_id].on('subscribeFail', function (err) {
                     console.error('Failed to subscribe to the sample channel due to error: ' + err);
                 });
-                if(lh.nodejsHelperOptions.instance_id > 0){
-                    var typingIndicator = $('#user-is-typing-'+lh.nodejsHelperOptions.instance_id+'_'+chat_id);
-                } else{
-                    var typingIndicator = $('#user-is-typing-'+chat_id);
-                }
+                
+                var typingIndicator = $('#user-is-typing-'+chat_id);
 
                 channelList[chat_id].watch(function (op) {
                     if (op.op == 'vt') { // Visitor typing text
@@ -66,9 +56,9 @@ var channelList = [];
     function operatorTypingListener(data) {
         data.ttx = lh.nodejsHelperOptions.typer;
         ee.emitEvent('nodeJsTypingOperator', [data]);
-        if(lh.nodejsHelperOptions.instance_id > 0){
+        if (lh.nodejsHelperOptions.instance_id > 0) {
             socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+data.chat_id,{'op':'ot','data':data}); // Operator typing
-        } else{
+        } else {
             socket.publish('chat_'+data.chat_id,{'op':'ot','data':data}); // Operator typing
         }
     }
@@ -87,7 +77,7 @@ var channelList = [];
     socket.on('close', function() {
         try {
             lhinst.nodeJsMode = false;
-            channelList.forEach(function(channel){
+            channelList.forEach(function(channel) {
                  if (typeof channel !== 'undefined') {
                     channel.destroy();
                  }
@@ -106,14 +96,14 @@ var channelList = [];
         }
     });
 
-    socket.emit('login', {hash:lh.nodejsHelperOptions.hash, chanelName: chanelName}, function (err) {      
-        if (err) {
-            console.log(err);
+    socket.on('connect', function () {
+        if (socket.authState == 'unauthenticated') {
+            socket.emit('login', {hash: lh.nodejsHelperOptions.hash}, function (err) {      
+                if (err) {
+                    console.log(err);
+                }
+              });
         }
-      });
-
-    socket.on('connect', function (status) {
-        if(status.isAuthenticated){
         try {
         lhinst.nodeJsMode = true;
         lhinst.chatsSynchronising.forEach(function (chat_id) {
@@ -128,7 +118,7 @@ var channelList = [];
         } catch (e) {
             console.log(e);
         }
-    }});
+        });
 
     $(window).on('beforeunload', function () {
         socket.destroy();

@@ -40,25 +40,25 @@ class Worker extends SCWorker {
       socket.on('login', function (token, respond) {
         var tokenParts = token.hash.split('.');
         var secNow = Math.round(Date.now()/1000);
-        if(tokenParts[1] > (secNow - 60*60)){
-          var SHA1 = function(input){
+        if(tokenParts[1] > (secNow - 60*60)) {
+          var SHA1 = function(input) {
             return crypto.createHash('sha1').update(input).digest('hex');
           }
-          if(tokenParts[1]){
+          if(tokenParts[1]) {
             var validateVisitorHash = SHA1(tokenParts[1] + 'Visitor' + secretHash);
-            var validateOperatorHash = SHA1(tokenParts[1] + 'Operator' + secretHash); 
+            var validateOperatorHash = SHA1(tokenParts[1] + 'Operator' + secretHash);
+            var validateCustomHash = SHA1(tokenParts[1] + 'Custom' + secretHash);
           }
-          if((tokenParts[0] == validateVisitorHash) || (tokenParts[0] == validateOperatorHash)){
+          if((tokenParts[0] == validateVisitorHash) || (tokenParts[0] == validateOperatorHash) || (tokenParts[0] == validateCustomHash)) {
             respond();
-            socket.setAuthToken({token:token.hash, exp: (secNow + 60*30), chanelName:token.chanelName});
+            socket.setAuthToken({token: token.hash, exp: (secNow + 60*30)});
           } else {
-            // Passing string as first argument indicates error
             respond('Login failed');
           }
-        } else{
+        } else {
           respond('Login failed');
         }
-        });
+      });
 
       // Some sample logic to show how to handle client events,
       // replace this with your own logic
@@ -82,13 +82,21 @@ class Worker extends SCWorker {
 
     scServer.addMiddleware(scServer.MIDDLEWARE_PUBLISH_IN, function (req, next) {
       var authToken = req.socket.authToken;
-
-      if (authToken && req.channel == authToken.chanelName) {
-        next();
-      } else {
-        next('You are not authorized to publish to ' + req.channel);
-      }
+        if(authToken) {
+          next();
+        } else {
+          next('You are not authorized to publish to ' + req.channel);
+        }
     });
+
+    scServer.addMiddleware(scServer.MIDDLEWARE_SUBSCRIBE, function (req, next) {
+      var authToken = req.socket.authToken;
+        if(authToken) {
+          next();
+        } else {
+          next('You are not authorized to subscribe to ' + req.channel);
+        }
+      });
   }
 }
 
