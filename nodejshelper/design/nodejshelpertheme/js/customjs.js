@@ -13,26 +13,41 @@
         socketOptions.secure = true;
     }
 
-	// Initiate the connection to the server
-	var socket = socketCluster.connect(socketOptions);
+    // Initiate the connection to the server
+    var socket = socketCluster.connect(socketOptions);
 
-	socket.on('error', function (err) {
-		console.error(err);
-	});
+    socket.on('error', function (err) {
+        console.error(err);
+    });
 
-	socket.on('connect', function () {
-		//console.log('Socket is connected');
-	});
+    function connectSiteVisitor(){
+        var sampleChannel = socket.subscribe('uo_' + lh_inst.cookieDataPers.vid);
 
-	var sampleChannel = socket.subscribe('uo_' + lh_inst.cookieDataPers.vid);
+        sampleChannel.on('subscribeFail', function (err) {
+            console.error('Failed to subscribe to the sample channel due to error: ' + err);
+        });
 
-	sampleChannel.on('subscribeFail', function (err) {
-		console.error('Failed to subscribe to the sample channel due to error: ' + err);
-	});
+        sampleChannel.watch(function (op) {
+            if (op.op == 'check_message') {
+                lh_inst.startNewMessageCheckSingle();
+            }
+        });
+    }
 
-	sampleChannel.watch(function (op) {
-		if (op.op == 'check_message') {
-            lh_inst.startNewMessageCheckSingle();
-		}
-	});
+	var chanelName = ('chat_'+'uo_' + lh_inst.cookieDataPers.vid);
+
+    socket.on('connect', function (status) {
+        if (status.isAuthenticated) {
+            connectSiteVisitor();
+        } else {
+            socket.emit('login', {hash:lh_inst.nodejsHelperOptions.hash, chanelName: chanelName}, function (err) {
+                if (err) {
+                    console.log(err);
+                } else {
+                    connectSiteVisitor();
+                }
+            });
+        }
+    });
+
 })();
