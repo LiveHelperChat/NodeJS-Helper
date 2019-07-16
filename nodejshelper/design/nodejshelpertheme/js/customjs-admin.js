@@ -102,6 +102,8 @@ var channelList = [];
 
             confLH.chat_message_sinterval = confLH.defaut_chat_message_sinterval;
 
+            ee.emitEvent('socketDisconnected', [socket]);
+
         } catch (e) {
             console.log(e);
         }
@@ -119,6 +121,8 @@ var channelList = [];
             ee.addListener('operatorTyping', operatorTypingListener);
             ee.addListener('removeSynchroChat', removeSynchroChatListener);
             confLH.chat_message_sinterval = 15000;
+
+            ee.emitEvent('socketConnected', [socket]);
         } catch (e) {
             console.log(e);
         }
