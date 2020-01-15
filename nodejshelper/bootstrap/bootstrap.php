@@ -31,7 +31,39 @@ class erLhcoreClassExtensionNodejshelper {
         $dispatcher->listen('chat.accept', array( $this,'statusChange' ));
         $dispatcher->listen('chat.close', array( $this,'statusChange' ));
         $dispatcher->listen('chat.genericbot_chat_command_transfer', array( $this,'statusChange' ));
+        
+        // React based widget init calls
+        $dispatcher->listen('widgetrestapi.initchat', array( $this,'initChat' ));
 	}
+
+	public function initChat($params) {
+
+	 if (
+        strpos($_SERVER['HTTP_USER_AGENT'],'MSIE 10.0') === false &&
+        strpos($_SERVER['HTTP_USER_AGENT'],'MSIE 9.0') === false &&
+        strpos($_SERVER['HTTP_USER_AGENT'],'MSIE 8.0') === false &&
+        strpos($_SERVER['HTTP_USER_AGENT'],'MSIE 7.0') === false) {
+
+            if (!isset($params['output']['init_calls'])) {
+                 $params['output']['init_calls'] = array();
+            }
+
+            $date = time();
+            $options = array(
+                'hostname' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('hostname'),
+                'path' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('path'),
+                'port' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('port'),
+                'secure' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('secure'),
+                'hash' => sha1($date . 'Visitor' . erConfigClassLhConfig::getInstance()->getSetting('site','secrethash')) . '.' . $date ,
+                'instance_id' => ((erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) ? erLhcoreClassInstance::getInstance()->id : 0)
+            );
+
+            $params['output']['init_calls'][] = array(
+                'extension' => 'nodeJSChat',
+                'params' => $options
+            );
+        }
+    }
 
     public function __get($var)
     {
