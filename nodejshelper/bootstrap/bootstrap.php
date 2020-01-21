@@ -34,7 +34,36 @@ class erLhcoreClassExtensionNodejshelper {
         
         // React based widget init calls
         $dispatcher->listen('widgetrestapi.initchat', array( $this,'initChat' ));
+        $dispatcher->listen('widgetrestapi.settings', array( $this,'initOnlineVisitor' ));
 	}
+
+	public function initOnlineVisitor($params) {
+        if (
+            strpos($_SERVER['HTTP_USER_AGENT'],'MSIE 10.0') === false &&
+            strpos($_SERVER['HTTP_USER_AGENT'],'MSIE 9.0') === false &&
+            strpos($_SERVER['HTTP_USER_AGENT'],'MSIE 8.0') === false &&
+            strpos($_SERVER['HTTP_USER_AGENT'],'MSIE 7.0') === false) {
+
+            if (!isset($params['output']['init_calls'])) {
+                $params['output']['init_calls'] = array();
+            }
+
+            $date = time();
+            $options = array(
+                'hostname' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('hostname'),
+                'path' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('path'),
+                'port' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('port'),
+                'secure' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('secure'),
+                'hash' => sha1($date . 'Visitor' . erConfigClassLhConfig::getInstance()->getSetting('site','secrethash')) . '.' . $date ,
+                'instance_id' => ((erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) ? erLhcoreClassInstance::getInstance()->id : 0)
+            );
+
+            $params['output']['init_calls'][] = array(
+                'extension' => 'nodeJSChat',
+                'params' => $options
+            );
+        }
+    }
 
 	public function initChat($params) {
 
@@ -153,9 +182,13 @@ class erLhcoreClassExtensionNodejshelper {
     
 	public function messageReceived($params)
     {
-        if(erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')){
+        if (!isset($params['chat'])){
+            return;
+        }
+
+        if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')){
             erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('op' => 'cmsg')));
-        } else{
+        } else {
             erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('op' => 'cmsg')));
         }
     }
