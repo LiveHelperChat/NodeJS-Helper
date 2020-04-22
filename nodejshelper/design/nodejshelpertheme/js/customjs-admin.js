@@ -53,8 +53,12 @@ var channelList = [];
                     } else if (op.op == 'vts') { // Visitor typing stopped
                         typingIndicator.text(op.msg).css('visibility','hidden');
                     } else if (op.op == 'cmsg') { // Visitor has send a message
-                        var lhcController = angular.element('body').scope();
-                        lhcController.loadchatMessagesScope();
+                        if (typeof angular !== 'undefined') {
+                            var lhcController = angular.element('body').scope();
+                            lhcController.loadchatMessagesScope();
+                        } else {
+                            lhinst.syncadmincall();
+                        }
                     }
                 });
             }
