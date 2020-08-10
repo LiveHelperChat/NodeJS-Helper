@@ -27,6 +27,9 @@ class erLhcoreClassExtensionNodejshelper {
         $dispatcher->listen('chat.added_operation', array( $this,'messageReceivedAdmin' ));
         $dispatcher->listen('chat.chatwidgetchat', array( $this,'messageReceived' ));
 
+        // Message updated
+        $dispatcher->listen('chat.message_updated', array( $this,'messageReceived' ));
+
         // Chat was accepted.
         $dispatcher->listen('chat.accept', array( $this,'statusChange' ));
         $dispatcher->listen('chat.close', array( $this,'statusChange' ));
