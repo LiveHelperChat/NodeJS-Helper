@@ -36,6 +36,11 @@ class Worker extends SCWorker {
     scServer.on('connection', function (socket) {
 
       socket.on('login', function (token, respond) {
+        if (typeof token.hash === 'undefined') {
+          respond('Login failed');
+          return ;
+        }
+        
         var tokenParts = token.hash.split('.');
         var secNow = Math.round(Date.now()/1000);
 
