@@ -68,6 +68,12 @@ var channelList = [];
     }
 
     function operatorTypingListener(data) {
+        var userDom = document.getElementById('chat-owner-'+data.chat_id);
+
+        if (userDom !== null && confLH.user_id != userDom.getAttribute('user-id')) {
+            return ;
+        }
+
         data.ttx = lh.nodejsHelperOptions.typer;
         ee.emitEvent('nodeJsTypingOperator', [data]);
         if (lh.nodejsHelperOptions.instance_id > 0) {
