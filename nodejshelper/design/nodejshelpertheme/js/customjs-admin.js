@@ -50,8 +50,10 @@ var channelList = [];
 
                     if (op.op == 'vt') { // Visitor typing text
                         typingIndicator.text(op.msg).css('visibility','visible');
+                        ee.emitEvent('nodeJsTypingVisitor', [{id:chat_id, txt: op.msg}]);
                     } else if (op.op == 'vts') { // Visitor typing stopped
                         typingIndicator.text(op.msg).css('visibility','hidden');
+                        ee.emitEvent('nodeJsTypingVisitorStopped', [{id:chat_id}]);
                     } else if (op.op == 'cmsg') { // Visitor has send a message
                         if (typeof angular !== 'undefined') {
                             var lhcController = angular.element('body').scope();
