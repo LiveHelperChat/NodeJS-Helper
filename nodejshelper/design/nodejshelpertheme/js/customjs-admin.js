@@ -55,12 +55,7 @@ var channelList = [];
                         typingIndicator.text(op.msg).css('visibility','hidden');
                         ee.emitEvent('nodeJsTypingVisitorStopped', [{id:chat_id}]);
                     } else if (op.op == 'cmsg') { // Visitor has send a message
-                        if (typeof angular !== 'undefined') {
-                            var lhcController = angular.element('body').scope();
-                            lhcController.loadchatMessagesScope();
-                        } else {
-                            lhinst.syncadmincall();
-                        }
+                        lhinst.syncadmincall();
                     }
                 });
             }
