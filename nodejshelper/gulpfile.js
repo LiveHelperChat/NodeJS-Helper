@@ -31,6 +31,4 @@ gulp.task('js-nodejshelper-admin', function() {
 	.pipe(gulp.dest('design/nodejshelpertheme/js'));
 });
 
-gulp.task('default', gulp.series('js-nodejshelper','js-nodejshelper-widget','js-nodejshelper-admin', function() {
-    // Just execute all the tasks
-}));
+gulp.task('default', gulp.series('js-nodejshelper','js-nodejshelper-widget','js-nodejshelper-admin'));

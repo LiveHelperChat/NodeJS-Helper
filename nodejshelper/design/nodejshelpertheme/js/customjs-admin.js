@@ -45,9 +45,7 @@ var channelList = [];
                 });
 
                 channelList[chat_id].watch(function (op) {
-
                     var typingIndicator = $('#user-is-typing-'+chat_id);
-
                     if (op.op == 'vt') { // Visitor typing text
                         typingIndicator.text(op.msg).css('visibility','visible');
                         ee.emitEvent('nodeJsTypingVisitor', [{id:chat_id, txt: op.msg}]);
