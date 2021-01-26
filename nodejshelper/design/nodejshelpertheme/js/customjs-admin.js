@@ -4,7 +4,8 @@ var channelList = [];
 
     var socketOptions = {
         hostname: lh.nodejsHelperOptions.hostname,
-        path: lh.nodejsHelperOptions.path
+        path: lh.nodejsHelperOptions.path,
+        authTokenName: 'socketCluster.authToken_admin'
     }
 
     if (lh.nodejsHelperOptions.port != '') {
@@ -44,6 +45,12 @@ var channelList = [];
                     console.error('Failed to subscribe to the sample channel due to error: ' + err);
                 });
 
+                channelList[chat_id].on('subscribe', function (channelName) {
+                    $('#user-is-typing-'+chat_id).html('<span id="node-js-indicator-'+chat_id+'" class="material-icons fs12 text-danger">wifi_off</span>').css('visibility','visible');
+                    ee.emitEvent('nodeJsVisitorStatus', [{id:chat_id, status: false}]);
+                    socket.publish(channelName,{'op':'vo'}); // Operator sends request to know visitor status
+                });
+
                 channelList[chat_id].watch(function (op) {
                     var typingIndicator = $('#user-is-typing-'+chat_id);
                     if (op.op == 'vt') { // Visitor typing text
@@ -54,6 +61,9 @@ var channelList = [];
                         ee.emitEvent('nodeJsTypingVisitorStopped', [{id:chat_id}]);
                     } else if (op.op == 'cmsg') { // Visitor has send a message
                         lhinst.syncadmincall();
+                    } else if (op.op == 'vi_online') { // Visitor has send a message
+                        typingIndicator.html('<span id="node-js-indicator-'+chat_id+'" class="material-icons fs12 '+(op.status == true ? 'text-success' : 'text-danger')+'">'+(op.status == true ? 'wifi' : 'wifi_off')+'</span>').css('visibility','visible');
+                        ee.emitEvent('nodeJsVisitorStatus', [{id:chat_id, status: op.status}]);
                     }
                 });
             }

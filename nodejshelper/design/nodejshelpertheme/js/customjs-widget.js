@@ -72,6 +72,10 @@ setTimeout(function() {
             console.error('Failed to subscribe to the sample channel due to error: ' + err);
         });
 
+        sampleChannel.on('subscribe', function () {
+            socket.publish((lh.nodejsHelperOptions.instance_id > 0 ? 'chat_'+lh.nodejsHelperOptions.instance_id + '_' + lhinst.chat_id : 'chat_' + lhinst.chat_id), {'op':'vi_online', status: true});
+        });
+
         sampleChannel.watch(function (op) {
             if (op.op == 'ot') { // Operator Typing Message
                 var instStatus = $('#id-operator-typing');
@@ -86,6 +90,8 @@ setTimeout(function() {
             } else if (op.op == 'schange') {
                 lhinst.chatsyncuserpending();
                 lhinst.syncusercall();
+            } else if (op.op == 'vo') {
+                 socket.publish((lh.nodejsHelperOptions.instance_id > 0 ? 'chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id : 'chat_'+lhinst.chat_id) ,{'op':'vi_online', status: true});
             }
         });
 

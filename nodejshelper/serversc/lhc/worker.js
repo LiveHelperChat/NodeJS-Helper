@@ -56,7 +56,7 @@ class Worker extends SCWorker {
 
             if ((tokenParts[0] == validateVisitorHash) || (tokenParts[0] == validateOperatorHash)) {
                 respond();
-                socket.setAuthToken({token:token.hash, exp: (secNow + 60*30), chanelName:token.chanelName});
+                socket.setAuthToken({token:token.hash, exp: (secNow + 60*50), chanelName:token.chanelName, isVisitor : (tokenParts[0] == validateVisitorHash)});
             } else {
                 // Passing string as first argument indicates error
                 respond('Login failed');
@@ -65,25 +65,32 @@ class Worker extends SCWorker {
         } else {
             respond('Login failed');
         }
-
-
       });
 
       socket.on('disconnect', function () {
-        //clearInterval(interval);
+          if (socket.authToken !== null && socket.authToken.chanelNameChat && socket.authToken.isVisitor === true) {
+              scServer.exchange.publish(socket.authToken.chanelNameChat, {'op':'vi_online','status':false});
+          }
       });
     });
 
-      scServer.addMiddleware(scServer.MIDDLEWARE_SUBSCRIBE,
-          function (req, next) {
-              var authToken = req.socket.authToken;
-              if (authToken) {
-                  next(); // Allow
-              } else {
-                  next('You are not authorized to subscribe to ' + req.channel); // Block
-              }
-          }
-      );
+    scServer.addMiddleware(scServer.MIDDLEWARE_SUBSCRIBE,
+         function (req, next) {
+             var authToken = req.socket.authToken;
+             if (authToken) {
+
+                 if (req.channel.indexOf('chat_') !== -1 && authToken.isVisitor === true) {
+                     // Inform operator that visitor has restored connection
+                     req.socket.authToken.chanelNameChat = req.channel;
+                     scServer.exchange.publish(req.channel, {'op':'vi_online','status':true})
+                 }
+
+                 next(); // Allow
+             } else {
+                 next('You are not authorized to subscribe to ' + req.channel); // Block
+             }
+         }
+    );
 
     scServer.addMiddleware(scServer.MIDDLEWARE_PUBLISH_IN, function (req, next) {
       var authToken = req.socket.authToken;
