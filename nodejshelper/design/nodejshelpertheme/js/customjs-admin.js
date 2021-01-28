@@ -143,16 +143,30 @@ var channelList = [];
         }
     }
 
+    socket.on('deauthenticate', function(){
+        $.postJSON(WWW_DIR_JAVASCRIPT + 'nodejshelper/tokenadmin', function(data) {
+            socket.emit('login', {hash:data, chanelName: chanelName}, function (err) {
+                if (err) {
+                    console.log(err);
+                    socket.destroy();
+                }
+            });
+        });
+    });
+
     socket.on('connect', function (status) {
         if (status.isAuthenticated) {
             connectAdmin();
         } else {
-            socket.emit('login', {hash:lh.nodejsHelperOptions.hash, chanelName: chanelName}, function (err) {
-                if (err) {
-                    console.log(err);
-                } else {
-                    connectAdmin();
-                }
+            $.postJSON(WWW_DIR_JAVASCRIPT + 'nodejshelper/tokenadmin', function(data) {
+                socket.emit('login', {hash:data, chanelName: chanelName}, function (err) {
+                    if (err) {
+                        console.log(err);
+                        socket.destroy();
+                    } else {
+                        connectAdmin();
+                    }
+                });
             });
         }
     });

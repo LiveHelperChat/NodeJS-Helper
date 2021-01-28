@@ -2,7 +2,8 @@
 
 	var socketOptions = {
         hostname: lh_inst.nodejsHelperOptions.hostname,
-        path: lh_inst.nodejsHelperOptions.path
+        path: lh_inst.nodejsHelperOptions.path,
+        authTokenName: 'socketCluster.authToken_vi'
     }
 
     if (lh_inst.nodejsHelperOptions.port != '') {
@@ -34,7 +35,7 @@
         });
     }
 
-	var chanelName = ('chat_'+'uo_' + lh_inst.cookieDataPers.vid);
+	var chanelName = ('uo_' + lh_inst.cookieDataPers.vid);
 
     socket.on('connect', function (status) {
         if (status.isAuthenticated) {

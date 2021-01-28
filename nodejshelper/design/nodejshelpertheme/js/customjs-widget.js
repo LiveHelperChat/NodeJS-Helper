@@ -108,16 +108,30 @@ setTimeout(function() {
         lhinst.syncusercall();
     }
 
+    socket.on('deauthenticate', function() {
+        $.post(WWW_DIR_JAVASCRIPT + 'nodejshelper/tokenvisitor/' + lhinst.chat_id + '/' + lhinst.hash, function(data) {
+            socket.emit('login', {hash:data, chanelName: chanelName}, function (err) {
+                if (err) {
+                    console.log(err);
+                    socket.destroy();
+                }
+            });
+        });
+    });
+
     socket.on('connect', function (status) {
         if (status.isAuthenticated && lhinst.chat_id > 0) {
             connectVisitor();
         } else {
-            socket.emit('login', {hash:lh.nodejsHelperOptions.hash, chanelName: chanelName}, function (err) {
-                if (err) {
-                    console.log(err);
-                } else {
-                    connectVisitor();
-                }
+            $.post(WWW_DIR_JAVASCRIPT + 'nodejshelper/tokenvisitor/' + lhinst.chat_id + '/' + lhinst.hash, function(data) {
+                socket.emit('login', {hash:data, chanelName: chanelName}, function (err) {
+                    if (err) {
+                        console.log(err);
+                        socket.destroy();
+                    } else {
+                        connectVisitor();
+                    }
+                });
             });
         }
     });
