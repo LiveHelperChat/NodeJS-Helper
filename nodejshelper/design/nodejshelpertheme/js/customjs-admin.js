@@ -5,7 +5,8 @@ var channelList = [];
     var socketOptions = {
         hostname: lh.nodejsHelperOptions.hostname,
         path: lh.nodejsHelperOptions.path,
-        authTokenName: 'socketCluster.authToken_admin'
+        authTokenName: 'socketCluster.authToken_admin',
+        autoReconnectOptions: {initialDelay: 5000, randomness: 5000}
     }
 
     if (lh.nodejsHelperOptions.port != '') {

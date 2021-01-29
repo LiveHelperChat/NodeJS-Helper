@@ -2,7 +2,8 @@ setTimeout(function() {
 
     var socketOptions = {
         hostname: lh.nodejsHelperOptions.hostname,
-        path: lh.nodejsHelperOptions.path
+        path: lh.nodejsHelperOptions.path,
+        autoReconnectOptions: {initialDelay: 5000, randomness: 5000}
     }
 
     if (lh.nodejsHelperOptions.port != '') {

@@ -65,7 +65,8 @@ class Worker extends SCWorker {
 
             if ((tokenParts[0] == validateVisitorHash) || (tokenParts[0] == validateOperatorHash)) {
                 respond();
-                socket.setAuthToken({token:token.hash, exp: (secNow + 50*60), chanelName:token.chanelName, isChatToken: isChatToken, isVisitor : (tokenParts[0] == validateVisitorHash)});
+                isVisitor = (tokenParts[0] == validateVisitorHash);
+                socket.setAuthToken({token:token.hash, exp: (secNow + (isVisitor ? 50*60 : 12*60)), chanelName:token.chanelName, isChatToken: isChatToken, isVisitor : isVisitor});
             } else {
                 // Passing string as first argument indicates error
                 respond('Login failed');
