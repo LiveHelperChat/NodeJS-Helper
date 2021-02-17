@@ -49,7 +49,32 @@ setTimeout(function() {
         }
     }
 
-    socket.on('close', function(){
+    function messageSend(data)
+    {
+        if (lh.nodejsHelperOptions.instance_id > 0) {
+            socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id, {'op':'vt','msg':'✉️ ' + data.msg});
+        } else {
+            socket.publish('chat_'+lhinst.chat_id,{'op':'vt', 'msg':'✉️ ' + data.msg});
+        }
+    }
+
+    function messageSendError(data)
+    {
+        if (lh.nodejsHelperOptions.instance_id > 0) {
+            socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id,{'op':'vt','msg':'📕️ error happened while sending visitor message, please inform your administrator!'});
+        } else {
+            socket.publish('chat_'+lhinst.chat_id, {'op':'vt','msg':'📕️ error happened while sending visitor message, please inform your administrator!'});
+        }
+    }
+
+    function endedChat()
+    {
+        if (socket !== null) {
+            socket.destroy();
+        }
+    }
+
+    socket.on('close', function() {
         LHCCallbacks.initTypingMonitoringUserInform = false;
 
         if (sampleChannel !== null) {
@@ -58,6 +83,9 @@ setTimeout(function() {
 
         ee.removeListener('visitorTyping', visitorTypingListener);
         ee.removeListener('visitorTypingStopped', visitorTypingStoppedListener);
+        ee.removeListener('messageSend', messageSend);
+        ee.removeListener('messageSendError', messageSendError);
+        ee.removeListener('endedChat', endedChat);
 
         confLH.chat_message_sinterval = confLH.defaut_chat_message_sinterval;
     });
@@ -101,6 +129,9 @@ setTimeout(function() {
 
         ee.addListener('visitorTyping', visitorTypingListener);
         ee.addListener('visitorTypingStopped', visitorTypingStoppedListener);
+        ee.addListener('messageSend', messageSend);
+        ee.addListener('messageSendError', messageSendError);
+        ee.addListener('endedChat', endedChat);
 
         // Make larger sync interval
         confLH.chat_message_sinterval = 10000;
