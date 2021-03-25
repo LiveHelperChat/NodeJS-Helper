@@ -116,6 +116,8 @@ setTimeout(function() {
                 }
             } else if (op.op == 'cmsg') {
                 lhinst.syncusercall();
+            } else if (op.op == 'umsg') { // Message was updated
+                    lhinst.updateMessageRow(op.msid);
             } else if (op.op == 'schange') {
                 lhinst.chatsyncuserpending();
                 lhinst.syncusercall();

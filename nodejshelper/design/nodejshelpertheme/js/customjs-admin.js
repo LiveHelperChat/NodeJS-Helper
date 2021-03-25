@@ -62,6 +62,8 @@ var channelList = [];
                         ee.emitEvent('nodeJsTypingVisitorStopped', [{id:chat_id}]);
                     } else if (op.op == 'cmsg') { // Visitor has send a message
                         lhinst.syncadmincall();
+                    } else if (op.op == 'umsg') { // Message was updated
+                        lhinst.updateMessageRowAdmin(chat_id,op.msid);
                     } else if (op.op == 'vi_online') { // Visitor has send a message
                         typingIndicator.html('<span id="node-js-indicator-'+chat_id+'" class="material-icons fs12 '+(op.status == true ? 'text-success' : 'text-danger')+'">'+(op.status == true ? 'wifi' : 'wifi_off')+'</span>').css('visibility','visible');
                         ee.emitEvent('nodeJsVisitorStatus', [{id:chat_id, status: op.status}]);

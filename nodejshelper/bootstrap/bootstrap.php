@@ -28,7 +28,7 @@ class erLhcoreClassExtensionNodejshelper {
         $dispatcher->listen('chat.chatwidgetchat', array( $this,'messageReceived' ));
 
         // Message updated
-        $dispatcher->listen('chat.message_updated', array( $this,'messageReceived' ));
+        $dispatcher->listen('chat.message_updated', array( $this,'messageUpdated' ));
 
         // Chat was accepted.
         $dispatcher->listen('chat.accept', array( $this,'statusChange' ));
@@ -180,7 +180,6 @@ class erLhcoreClassExtensionNodejshelper {
 	public function proactiveInvitationSend($params)
     {
         erLhcoreClassNodeJSRedis::instance()->publish('uo_' . $params['ou']->vid,'o:' . json_encode(array('op' => 'check_message')));
-        //erLhcoreClassNodeJSRedis::instance()->publish('sample','o:' . json_encode(array('op' => 'check_message')));
     }
     
 	public function messageReceived($params)
@@ -189,22 +188,39 @@ class erLhcoreClassExtensionNodejshelper {
             return;
         }
 
-        if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')){
+        if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) {
             erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('op' => 'cmsg')));
         } else {
             erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('op' => 'cmsg')));
         }
     }
 
+    public function messageUpdated($params)
+    {
+        if (!isset($params['chat'])){
+            return;
+        }
+
+        if (!isset($params['msg'])) {
+            self::messageReceived($params);
+            return;
+        }
+
+        if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) {
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('op' => 'umsg', 'msid' =>  $params['msg']->id)));
+        } else {
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('op' => 'umsg', 'msid' =>  $params['msg']->id)));
+        }
+    }
+
 	public function statusChange($params)
     {
-        if(erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')){
+        if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) {
             erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('op' => 'schange')));
         } else{
             erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('op' => 'schange')));
         }
     }
-
 
 }
 
