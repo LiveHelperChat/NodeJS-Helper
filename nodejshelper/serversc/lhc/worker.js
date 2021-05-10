@@ -40,7 +40,12 @@ class Worker extends SCWorker {
           respond('Login failed');
           return ;
         }
-        
+
+        if (typeof token.hash == 'object') {
+            token.instance_id = token.hash.instance_id;
+            token.hash = token.hash.hash;
+        }
+
         var tokenParts = token.hash.split('.');
         var secNow = Math.round(Date.now()/1000);
 
