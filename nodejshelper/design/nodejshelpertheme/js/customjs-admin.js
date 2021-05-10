@@ -18,6 +18,7 @@ var channelList = [];
     }
 
     var chanelName;
+    var onlineUsersChannel = null
 
     if (lh.nodejsHelperOptions.instance_id > 0) {
         chanelName = ('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id);
@@ -102,6 +103,21 @@ var channelList = [];
         }
     }
 
+    var presentOnlineVisitors = [];
+
+    function onlineVisitors(data) {
+        var newUsers = [];
+        var newList = [];
+
+        data.forEach(function(value, key) {
+            if (presentOnlineVisitors.indexOf(value.vid) === -1) {
+                socket.publish('uo_'+value.vid,{'op':'is_online'});
+            }
+            newList.push(value.vid);
+        });
+        presentOnlineVisitors = newList;
+    }
+
     socket.on('close', function() {
         try {
             lhinst.nodeJsMode = false;
@@ -138,7 +154,31 @@ var channelList = [];
             ee.addListener('chatTabLoaded', addChatToNodeJS);
             ee.addListener('operatorTyping', operatorTypingListener);
             ee.addListener('removeSynchroChat', removeSynchroChatListener);
+            ee.addListener('chatAdminSyncOnlineVisitors', onlineVisitors);
+
             confLH.chat_message_sinterval = 15000;
+
+            onlineUsersChannel = socket.subscribe('ous_'+lh.nodejsHelperOptions.instance_id);
+
+            onlineUsersChannel.on('subscribeFail', function (err) {
+                console.error('Failed to subscribe to the online users channel due to error: ' + err);
+            });
+
+            onlineUsersChannel.watch(function (op) {
+                if (op.op == 'vi_online') {
+                    var elm = document.getElementById('uo-vid-'+op.vid);
+                    if (elm !== null) {
+                        if (op.status === true) {
+                            elm.classList.add('online_user');
+                            document.getElementById('ou-face-'+op.vid).classList.add('icon-user-online');
+                        } else {
+                            elm.classList.remove('online_user');
+                            elm.classList.remove('recent_visit');
+                            document.getElementById('ou-face-'+op.vid).classList.remove('icon-user-online');
+                        }
+                    }
+                }
+             });
 
             ee.emitEvent('socketConnected', [socket]);
         } catch (e) {
@@ -148,7 +188,7 @@ var channelList = [];
 
     socket.on('deauthenticate', function(){
         $.postJSON(WWW_DIR_JAVASCRIPT + 'nodejshelper/tokenadmin', function(data) {
-            socket.emit('login', {hash:data, chanelName: chanelName}, function (err) {
+            socket.emit('login', {hash:data.hash, chanelName: chanelName, instance_id: data.instance_id}, function (err) {
                 if (err) {
                     console.log(err);
                     socket.destroy();
@@ -162,7 +202,7 @@ var channelList = [];
             connectAdmin();
         } else {
             $.postJSON(WWW_DIR_JAVASCRIPT + 'nodejshelper/tokenadmin', function(data) {
-                socket.emit('login', {hash:data, chanelName: chanelName}, function (err) {
+                socket.emit('login', {hash:data.hash, chanelName: chanelName, instance_id: data.instance_id}, function (err) {
                     if (err) {
                         console.log(err);
                         socket.destroy();

@@ -144,7 +144,7 @@ setTimeout(function() {
 
     socket.on('deauthenticate', function() {
         $.post(WWW_DIR_JAVASCRIPT + 'nodejshelper/tokenvisitor/' + lhinst.chat_id + '/' + lhinst.hash, function(data) {
-            socket.emit('login', {hash:data, chanelName: chanelName}, function (err) {
+            socket.emit('login', {hash:data.hash, chanelName: chanelName, instance_id: data.instance_id}, function (err) {
                 if (err) {
                     console.log(err);
                     socket.destroy();
@@ -158,7 +158,7 @@ setTimeout(function() {
             connectVisitor();
         } else {
             $.post(WWW_DIR_JAVASCRIPT + 'nodejshelper/tokenvisitor/' + lhinst.chat_id + '/' + lhinst.hash, function(data) {
-                socket.emit('login', {hash:data, chanelName: chanelName}, function (err) {
+                socket.emit('login', {hash:data.hash, chanelName: chanelName, instance_id: data.instance_id}, function (err) {
                     if (err) {
                         console.log(err);
                         socket.destroy();

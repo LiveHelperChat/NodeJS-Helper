@@ -66,7 +66,7 @@ class Worker extends SCWorker {
             if ((tokenParts[0] == validateVisitorHash) || (tokenParts[0] == validateOperatorHash)) {
                 respond();
                 isVisitor = (tokenParts[0] == validateVisitorHash);
-                socket.setAuthToken({token:token.hash, exp: (secNow + (isVisitor ? 120*60 : 60*12*60)), chanelName:token.chanelName, isChatToken: isChatToken, isVisitor : isVisitor});
+                socket.setAuthToken({token:token.hash, exp: (secNow + (isVisitor ? 120*60 : 60*12*60)), chanelName:token.chanelName, instance_id: token.instance_id, isChatToken: isChatToken, isVisitor : isVisitor});
             } else {
                 // Passing string as first argument indicates error
                 respond('Login failed');
@@ -80,6 +80,9 @@ class Worker extends SCWorker {
       socket.on('disconnect', function () {
           if (socket.authToken !== null && socket.authToken.chanelNameChat && socket.authToken.isVisitor === true) {
               scServer.exchange.publish(socket.authToken.chanelNameChat, {'op':'vi_online','status':false});
+          } else if (socket.authToken !== null && socket.authToken.isVisitor === true) {
+              var parts = socket.authToken.chanelName.split('_');
+              scServer.exchange.publish('ous_' + socket.authToken.instance_id, {'op':'vi_online', 'status':false, 'vid': parts[parts.length - 1]});
           }
       });
     });
@@ -99,6 +102,9 @@ class Worker extends SCWorker {
                      } else {
                          next('You are not authorized to subscribe to ' + req.channel); // Block
                      }
+                 } else if ( authToken.isVisitor === true) {
+                     var parts = req.socket.authToken.chanelName.split('_');
+                     scServer.exchange.publish('ous_' + req.socket.authToken.instance_id, {'op':'vi_online', 'status':true, 'vid': parts[parts.length - 1]});
                  }
 
                  next(); // Allow
