@@ -36,14 +36,19 @@ class Worker extends SCWorker {
     scServer.on('connection', function (socket) {
 
       socket.on('login', function (token, respond) {
-        if (typeof token.hash === 'undefined') {
-          respond('Login failed');
-          return ;
-        }
 
         if (typeof token.hash == 'object') {
-            token.instance_id = token.hash.instance_id;
+            if (typeof token.hash.hash !== 'string' || typeof token.hash.instance_id !== 'number') {
+                respond('Login failed');
+                return ;
+            }
+            token.instance_id = token.hash.instance_id ;
             token.hash = token.hash.hash;
+        }
+
+        if (typeof token.hash !== 'string' || typeof token.instance_id !== 'number') {
+             respond('Login failed');
+             return ;
         }
 
         var tokenParts = token.hash.split('.');
