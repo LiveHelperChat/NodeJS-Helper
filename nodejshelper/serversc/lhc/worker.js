@@ -38,11 +38,11 @@ class Worker extends SCWorker {
       socket.on('login', function (token, respond) {
 
         if (typeof token.hash == 'object') {
-            if (typeof token.hash.hash !== 'string' || typeof token.hash.instance_id !== 'number') {
+            if (typeof token.hash.hash !== 'string') {
                 respond('Login failed');
                 return ;
             }
-            token.instance_id = token.hash.instance_id ;
+            token.instance_id = typeof token.hash.instance_id !== 'number' 0 : token.hash.instance_id;
             token.hash = token.hash.hash;
         }
 
