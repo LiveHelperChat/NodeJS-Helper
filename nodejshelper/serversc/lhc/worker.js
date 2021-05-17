@@ -42,7 +42,7 @@ class Worker extends SCWorker {
                 respond('Login failed');
                 return ;
             }
-            token.instance_id = typeof token.hash.instance_id !== 'number' 0 : token.hash.instance_id;
+            token.instance_id = typeof token.hash.instance_id !== 'number' ? 0 : token.hash.instance_id;
             token.hash = token.hash.hash;
         }
 
