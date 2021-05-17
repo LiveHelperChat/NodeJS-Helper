@@ -46,7 +46,11 @@ class Worker extends SCWorker {
             token.hash = token.hash.hash;
         }
 
-        if (typeof token.hash !== 'string' || typeof token.instance_id !== 'number') {
+        if (typeof token.instance_id !== 'number') {
+            token.instance_id = 0;
+        }
+
+        if (typeof token.hash !== 'string') {
              respond('Login failed');
              return ;
         }
