@@ -17,6 +17,10 @@
         $currentUser = erLhcoreClassUser::instance();
         $userData = $currentUser->getUserData(true); ?>
         lh.nodejsHelperOptions.typer = typeof lh.nodejsHelperOptions.typer !== 'undefined' ? lh.nodejsHelperOptions.typer : '<?php echo htmlspecialchars($userData->name_support,ENT_QUOTES);?> <?php echo erTranslationClassLhTranslation::getInstance()->getTranslation('chat/chat','is typing now...')?>';
+        lh.nodejsHelperOptions.trans = <?php echo json_encode(array(
+            'online' => erTranslationClassLhTranslation::getInstance()->getTranslation('chat/adminchat','Visitor online'),
+            'offline' => erTranslationClassLhTranslation::getInstance()->getTranslation('chat/adminchat','Visitor offline')
+        )); ?>;
         <?php endif;?>
     </script>
     <script src="<?php echo erLhcoreClassDesign::designJS('js/nodejshelper.admin.min.js');?>"></script>

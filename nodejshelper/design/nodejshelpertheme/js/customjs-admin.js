@@ -48,7 +48,7 @@ var channelList = [];
                 });
 
                 channelList[chat_id].on('subscribe', function (channelName) {
-                    $('#user-is-typing-'+chat_id).html('<span id="node-js-indicator-'+chat_id+'" class="material-icons fs12 text-danger">wifi_off</span>').css('visibility','visible');
+                    $('#user-is-typing-'+chat_id).html('<span id="node-js-indicator-'+chat_id+'" class="text-danger fs12"><span class="material-icons fs12">wifi_off</span><span class="node-js-online-status">'+lh.nodejsHelperOptions.trans.offline+'</span></span>').css('visibility','visible');
                     ee.emitEvent('nodeJsVisitorStatus', [{id:chat_id, status: false}]);
                     socket.publish(channelName,{'op':'vo'}); // Operator sends request to know visitor status
                 });
@@ -66,8 +66,12 @@ var channelList = [];
                     } else if (op.op == 'umsg') { // Message was updated
                         lhinst.updateMessageRowAdmin(chat_id,op.msid);
                     } else if (op.op == 'vi_online') { // Visitor has send a message
-                        typingIndicator.html('<span id="node-js-indicator-'+chat_id+'" class="material-icons fs12 '+(op.status == true ? 'text-success' : 'text-danger')+'">'+(op.status == true ? 'wifi' : 'wifi_off')+'</span>').css('visibility','visible');
+                        typingIndicator.html('<span id="node-js-indicator-'+chat_id+'" class="fs12 '+(op.status == true ? 'text-success' : 'text-danger')+'"><span class="material-icons fs12">'+(op.status == true ? 'wifi' : 'wifi_off')+'</span><span class="node-js-online-status">'+(op.status == true ? lh.nodejsHelperOptions.trans.online : lh.nodejsHelperOptions.trans.offline)+'</span></span>').css('visibility','visible');
                         ee.emitEvent('nodeJsVisitorStatus', [{id:chat_id, status: op.status}]);
+                    } else if (op.op == 'schange') {
+                        lhinst.updateVoteStatus(chat_id);
+                    } else if (op.op == 'cclose') {
+                        lhinst.reloadTab(chat_id, $('#tabs'), op.nick);
                     }
                 });
             }

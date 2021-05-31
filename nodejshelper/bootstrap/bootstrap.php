@@ -32,7 +32,7 @@ class erLhcoreClassExtensionNodejshelper {
 
         // Chat was accepted.
         $dispatcher->listen('chat.accept', array( $this,'statusChange' ));
-        $dispatcher->listen('chat.close', array( $this,'statusChange' ));
+        $dispatcher->listen('chat.close', array( $this,'chatClose' ));
         $dispatcher->listen('chat.genericbot_chat_command_transfer', array( $this,'statusChange' ));
         
         // React based widget init calls
@@ -217,8 +217,17 @@ class erLhcoreClassExtensionNodejshelper {
     {
         if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) {
             erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('op' => 'schange')));
-        } else{
+        } else {
             erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('op' => 'schange')));
+        }
+    }
+
+	public function chatClose($params)
+    {
+        if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) {
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('op' => 'cclose', 'nick' => mb_substr($params['chat']->nick,0,10))));
+        } else {
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('op' => 'cclose', 'nick' => mb_substr($params['chat']->nick,0,10))));
         }
     }
 
