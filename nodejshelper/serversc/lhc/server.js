@@ -51,7 +51,8 @@ var options = {
       host: '127.0.0.1',
       port: 6379
   },
-  secretHash: '<use_your_secret_hash>', //This secrethash of lhc settings, need for user authenticated
+  secretHash: '<use_your_secret_hash>', // This secrethash of lhc settings, need for user authenticated
+  trackVisitors: true         // Should we track all online visitors status. For performance reasons makes sense to have it false for very big websites
 };
 
 var bootTimeout = Number(process.env.SOCKETCLUSTER_CONTROLLER_BOOT_TIMEOUT) || 10000;

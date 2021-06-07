@@ -110,6 +110,11 @@ var channelList = [];
     var presentOnlineVisitors = [];
 
     function onlineVisitors(data) {
+
+        if (lh.nodejsHelperOptions.track_visitors === 0) {
+            return;
+        }
+
         var newUsers = [];
         var newList = [];
 
@@ -162,27 +167,29 @@ var channelList = [];
 
             confLH.chat_message_sinterval = 15000;
 
-            onlineUsersChannel = socket.subscribe('ous_'+lh.nodejsHelperOptions.instance_id);
+            if (lh.nodejsHelperOptions.track_visitors === 1) {
+                onlineUsersChannel = socket.subscribe('ous_'+lh.nodejsHelperOptions.instance_id);
 
-            onlineUsersChannel.on('subscribeFail', function (err) {
-                console.error('Failed to subscribe to the online users channel due to error: ' + err);
-            });
+                onlineUsersChannel.on('subscribeFail', function (err) {
+                    console.error('Failed to subscribe to the online users channel due to error: ' + err);
+                });
 
-            onlineUsersChannel.watch(function (op) {
-                if (op.op == 'vi_online') {
-                    var elm = document.getElementById('uo-vid-'+op.vid);
-                    if (elm !== null) {
-                        if (op.status === true) {
-                            elm.classList.add('online_user');
-                            document.getElementById('ou-face-'+op.vid).classList.add('icon-user-online');
-                        } else {
-                            elm.classList.remove('online_user');
-                            elm.classList.remove('recent_visit');
-                            document.getElementById('ou-face-'+op.vid).classList.remove('icon-user-online');
+                onlineUsersChannel.watch(function (op) {
+                    if (op.op == 'vi_online') {
+                        var elm = document.getElementById('uo-vid-'+op.vid);
+                        if (elm !== null) {
+                            if (op.status === true) {
+                                elm.classList.add('online_user');
+                                document.getElementById('ou-face-'+op.vid).classList.add('icon-user-online');
+                            } else {
+                                elm.classList.remove('online_user');
+                                elm.classList.remove('recent_visit');
+                                document.getElementById('ou-face-'+op.vid).classList.remove('icon-user-online');
+                            }
                         }
                     }
-                }
-             });
+                });
+            }
 
             ee.emitEvent('socketConnected', [socket]);
         } catch (e) {

@@ -10,8 +10,8 @@ class Worker extends SCWorker {
   run() {
     console.log('   >> Worker PID:', process.pid);
     var environment = this.options.environment;
-
     var secretHash = this.options.secretHash;
+    var onlineTrack = this.options.trackVisitors;
 
     var app = express();
 
@@ -94,7 +94,7 @@ class Worker extends SCWorker {
       socket.on('disconnect', function () {
           if (socket.authToken !== null && socket.authToken.chanelNameChat && socket.authToken.isVisitor === true) {
               scServer.exchange.publish(socket.authToken.chanelNameChat, {'op':'vi_online','status':false});
-          } else if (socket.authToken !== null && socket.authToken.isVisitor === true) {
+          } else if (socket.authToken !== null && socket.authToken.isVisitor === true && onlineTrack === true) {
               var parts = socket.authToken.chanelName.split('_');
               scServer.exchange.publish('ous_' + socket.authToken.instance_id, {'op':'vi_online', 'status':false, 'vid': parts[parts.length - 1]});
           }
@@ -116,7 +116,7 @@ class Worker extends SCWorker {
                      } else {
                          next('You are not authorized to subscribe to ' + req.channel); // Block
                      }
-                 } else if ( authToken.isVisitor === true) {
+                 } else if (authToken.isVisitor === true && onlineTrack === true) {
                      var parts = req.socket.authToken.chanelName.split('_');
                      scServer.exchange.publish('ous_' + req.socket.authToken.instance_id, {'op':'vi_online', 'status':true, 'vid': parts[parts.length - 1]});
                  }

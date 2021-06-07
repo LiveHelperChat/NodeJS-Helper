@@ -58,7 +58,8 @@ class erLhcoreClassExtensionNodejshelper {
                 'port' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('port'),
                 'secure' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('secure'),
                 'hash' => sha1($date . 'Visitor' . erConfigClassLhConfig::getInstance()->getSetting('site','secrethash')) . '.' . $date ,
-                'instance_id' => ((erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) ? erLhcoreClassInstance::getInstance()->id : 0)
+                'instance_id' => ((erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) ? erLhcoreClassInstance::getInstance()->id : 0),
+                'track_visitors' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('track_visitors')
             );
 
             $params['output']['init_calls'][] = array(
@@ -87,7 +88,8 @@ class erLhcoreClassExtensionNodejshelper {
                 'port' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('port'),
                 'secure' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('secure'),
                 'hash' => sha1($date . 'Visitor' . erConfigClassLhConfig::getInstance()->getSetting('site','secrethash')) . '.' . $date ,
-                'instance_id' => ((erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) ? erLhcoreClassInstance::getInstance()->id : 0)
+                'instance_id' => ((erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) ? erLhcoreClassInstance::getInstance()->id : 0),
+                'track_visitors' => erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('track_visitors'),
             );
 
             $params['output']['init_calls'][] = array(
@@ -146,6 +148,10 @@ class erLhcoreClassExtensionNodejshelper {
 
             case 'automated_hosting':
                 return $this->settings['automated_hosting'];
+                break;
+
+            case 'track_visitors':
+                return (isset($this->settings['public_settings']['track_visitors'])) ? $this->settings['public_settings']['track_visitors'] : 1;
                 break;
 
             default:

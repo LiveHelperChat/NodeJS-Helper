@@ -9,6 +9,7 @@ return array(
         'path' => '/socketcluster/',
         'port' => null, //some custom port
         'secure' => null, // true || false
+        'track_visitors' => 1 // true || false
     )
 );
 
