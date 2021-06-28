@@ -127,6 +127,15 @@ var channelList = [];
         presentOnlineVisitors = newList;
     }
 
+    function onlineVisitorsCheck(data) {
+        if (lh.nodejsHelperOptions.track_visitors === 0) {
+            return;
+        }
+        data.forEach(function(vid) {
+            socket.publish('uo_'+vid,{'op':'is_online'});
+       });
+    }
+
     socket.on('close', function() {
         try {
             lhinst.nodeJsMode = false;
@@ -164,6 +173,7 @@ var channelList = [];
             ee.addListener('operatorTyping', operatorTypingListener);
             ee.addListener('removeSynchroChat', removeSynchroChatListener);
             ee.addListener('chatAdminSyncOnlineVisitors', onlineVisitors);
+            ee.addListener('chatAdminIsOnline', onlineVisitorsCheck);
 
             confLH.chat_message_sinterval = 15000;
 
@@ -185,6 +195,18 @@ var channelList = [];
                                 elm.classList.remove('online_user');
                                 elm.classList.remove('recent_visit');
                                 document.getElementById('ou-face-'+op.vid).classList.remove('icon-user-online');
+                            }
+                        }
+
+                        var elm = document.getElementById('mass-uo-vid-'+op.vid);
+                        if (elm !== null) {
+                            if (op.status === true) {
+                                elm.classList.add('online_user');
+                                document.getElementById('mass-ou-face-'+op.vid).classList.add('icon-user-online');
+                            } else {
+                                elm.classList.remove('online_user');
+                                elm.classList.remove('recent_visit');
+                                document.getElementById('mass-ou-face-'+op.vid).classList.remove('icon-user-online');
                             }
                         }
                     }
