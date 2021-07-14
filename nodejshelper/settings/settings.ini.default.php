@@ -3,6 +3,7 @@
 return array(
     'connect_db' => 'localhost',
     'connect_db_id' => 0,
+    'connect_db_pass' => null,
     'automated_hosting' => false,
     'public_settings' => array(
         'hostname' => (isset($_SERVER['HTTP_HOST']) ? explode(':',$_SERVER['HTTP_HOST'])[0] : null),

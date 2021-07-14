@@ -48,8 +48,9 @@ var options = {
   logLevel: 1,
   environment: environment,
   brokerOptions: {
-      host: '127.0.0.1',
-      port: 6379
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: process.env.REDIS_PORT || '6379',
+      auth_pass: process.env.REDIS_PASS || null,
   },
   secretHash: '<use_your_secret_hash>', // This secrethash of lhc settings, need for user authenticated
   trackVisitors: true         // Should we track all online visitors status. For performance reasons makes sense to have it false for very big websites

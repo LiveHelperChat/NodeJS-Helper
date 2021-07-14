@@ -8,6 +8,11 @@ RUN mkdir -p /usr/src/
 WORKDIR /usr/src/
 COPY . /usr/src/
 
+ARG REDIS_HOST=localhost
+ENV REDIS_HOST ${REDIS_HOST}
+ARG REDIS_PASS=null
+ENV REDIS_PASS ${REDIS_PASS}
+
 RUN npm install .
 
 EXPOSE 8000
