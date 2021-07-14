@@ -11,7 +11,7 @@ class erLhcoreClassNodeJSRedis extends Credis_Client{
 	    $hostParts = explode(':', $settings['connect_db']);
 	    $port = isset($hostParts[1]) ? $hostParts[1] : 6379;
 	  	    
-		parent::__construct($hostParts[0],$port,null,'',$settings['connect_db_id']);
+		parent::__construct($hostParts[0],$port,null,'',$settings['connect_db_id'],$settings['connect_db_pass']);
 	}
 	
     public static function instance() {
