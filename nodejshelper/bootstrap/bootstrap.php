@@ -13,6 +13,7 @@ class erLhcoreClassExtensionNodejshelper {
         $dispatcher = erLhcoreClassChatEventDispatcher::getInstance();
         $dispatcher->listen('onlineuser.proactive_send_invitation',array($this,'proactiveInvitationSend'));
 
+        $dispatcher->listen('chat.messages_added_passive', array($this,'messageReceived'));
         $dispatcher->listen('chat.messages_added_fb', array($this,'messageReceived'));
         $dispatcher->listen('chat.addmsguser', array( $this, 'messageReceived' ));
         $dispatcher->listen('telegram.msg_received', array( $this, 'messageReceived' ));
