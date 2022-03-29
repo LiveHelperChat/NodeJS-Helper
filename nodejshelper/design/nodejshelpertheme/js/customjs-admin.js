@@ -139,11 +139,13 @@ var channelList = [];
     socket.on('close', function() {
         try {
             lhinst.nodeJsMode = false;
-            channelList.forEach(function(channel){
+
+            // On some it forces to stuck whole browser
+            /*channelList.forEach(function(channel){
                  if (typeof channel !== 'undefined') {
                     channel.destroy();
                  }
-            });
+            });*/
 
             channelList = [];
 
