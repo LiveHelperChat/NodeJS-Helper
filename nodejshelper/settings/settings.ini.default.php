@@ -9,7 +9,7 @@ return array(
         'hostname' => (isset($_SERVER['HTTP_HOST']) ? explode(':',$_SERVER['HTTP_HOST'])[0] : null),
         'path' => '/socketcluster/',
         'port' => null, //some custom port
-        'secure' => null, // true || false
+        'secure' => erLhcoreClassSystem::$httpsMode, // true || false
         'track_visitors' => 1 // true || false
     )
 );

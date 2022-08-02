@@ -16,6 +16,7 @@ class erLhcoreClassExtensionNodejshelper {
         $dispatcher->listen('chat.messages_added_passive', array($this,'messageReceived'));
         $dispatcher->listen('chat.messages_added_fb', array($this,'messageReceived'));
         $dispatcher->listen('chat.addmsguser', array( $this, 'messageReceived' ));
+
         $dispatcher->listen('telegram.msg_received', array( $this, 'messageReceived' ));
         $dispatcher->listen('twilio.sms_received', array( $this,'messageReceived' ));
 
@@ -30,6 +31,8 @@ class erLhcoreClassExtensionNodejshelper {
 
         // Message updated
         $dispatcher->listen('chat.message_updated', array( $this,'messageUpdated' ));
+        $dispatcher->listen('chat.reaction_visitor', array( $this,'messageUpdated' ));
+        $dispatcher->listen('chat.reaction_operator', array( $this,'messageUpdated' ));
 
         // Chat was accepted.
         $dispatcher->listen('chat.accept', array( $this,'statusChange' ));
