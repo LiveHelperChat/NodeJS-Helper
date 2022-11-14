@@ -12,6 +12,7 @@ class erLhcoreClassExtensionNodejshelper {
 
         $dispatcher = erLhcoreClassChatEventDispatcher::getInstance();
         $dispatcher->listen('onlineuser.proactive_send_invitation',array($this,'proactiveInvitationSend'));
+        $dispatcher->listen('onlineuser.update_js_vars',array($this,'proactiveInvitationSend'));
 
         $dispatcher->listen('chat.messages_added_passive', array($this,'messageReceived'));
         $dispatcher->listen('chat.messages_added_fb', array($this,'messageReceived'));
@@ -190,7 +191,9 @@ class erLhcoreClassExtensionNodejshelper {
 
 	public function proactiveInvitationSend($params)
     {
-        erLhcoreClassNodeJSRedis::instance()->publish('uo_' . $params['ou']->vid,'o:' . json_encode(array('op' => 'check_message')));
+        if (!isset($params['data_changed']) || $params['data_changed'] === true) {
+            erLhcoreClassNodeJSRedis::instance()->publish('uo_' . $params['ou']->vid,'o:' . json_encode(array('op' => 'check_message')));
+        }
     }
     
 	public function messageReceived($params)
