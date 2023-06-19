@@ -61,6 +61,10 @@ var channelList = [];
                     } else if (op.op == 'vts') { // Visitor typing stopped
                         typingIndicator.text(op.msg).css('visibility','hidden');
                         ee.emitEvent('nodeJsTypingVisitorStopped', [{id:chat_id}]);
+                    } else if (op.op == 'msgread') { // Operator messages was read
+                        $('#messagesBlock-'+op.cid).find('.msg-del-st-0,.msg-del-st-1,.msg-del-st-2').remove();
+                    } else if (op.op == 'msgdel') { // Operator messages was delivered
+                        $('#messagesBlock-'+op.cid).find('.msg-del-st-0,.msg-del-st-1').removeClass('msg-del-st-0 msg-del-st-1').addClass('msg-del-st-2').text('done_all');
                     } else if (op.op == 'cmsg') { // Visitor has send a message
                         lhinst.syncadmincall();
                     } else if (op.op == 'umsg') { // Message was updated

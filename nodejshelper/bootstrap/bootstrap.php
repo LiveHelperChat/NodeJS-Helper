@@ -44,6 +44,11 @@ class erLhcoreClassExtensionNodejshelper {
         // React based widget init calls
         $dispatcher->listen('widgetrestapi.initchat', array( $this,'initChat' ));
         $dispatcher->listen('widgetrestapi.settings', array( $this,'initOnlineVisitor' ));
+
+        // Visitor has just read messages
+        // Inform admin and mark messages as read one.
+        $dispatcher->listen('chat.messages_delivered', array( $this,'messagesWasDelivered' ));
+        $dispatcher->listen('chat.messages_read', array( $this,'messagesWasRead' ));
 	}
 
 	public function initOnlineVisitor($params) {
@@ -224,6 +229,32 @@ class erLhcoreClassExtensionNodejshelper {
             erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('op' => 'umsg', 'msid' =>  $params['msg']->id)));
         } else {
             erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('op' => 'umsg', 'msid' =>  $params['msg']->id)));
+        }
+    }
+
+    public function messagesWasRead($params)
+    {
+        if (!isset($params['chat'])){
+            return;
+        }
+
+        if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) {
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('cid' => $params['chat']->id, 'op' => 'msgread')));
+        } else {
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('cid' => $params['chat']->id, 'op' => 'msgread')));
+        }
+    }
+
+    public function messagesWasDelivered($params)
+    {
+        if (!isset($params['chat'])){
+            return;
+        }
+
+        if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) {
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('cid' => $params['chat']->id, 'op' => 'msgdel')));
+        } else {
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('cid' => $params['chat']->id, 'op' => 'msgdel')));
         }
     }
 
