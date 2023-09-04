@@ -1,4 +1,5 @@
 var channelList = [];
+var channelListMail = [];
 
 (function() {
 
@@ -167,6 +168,65 @@ var channelList = [];
         }
     });
 
+    function mailChatContentUnLoaded(mail_id) {
+        if (typeof channelListMail[mail_id] !== 'undefined')
+        {
+            channelListMail[mail_id].publish({'op':'opleft', 'user_id':confLH.user_id});
+            clearInterval(channelListMail[mail_id].monitoring_timeout);
+            try {
+                if (typeof channelListMail[mail_id] !== 'undefined') {
+                    channelListMail[mail_id].destroy();
+                    delete channelListMail[mail_id];
+                }
+            } catch (e) {
+                console.log(e);
+            }
+
+        }
+    }
+
+    function mailChatContentLoaded(mail_id) {
+
+        try {
+            if (typeof channelListMail[mail_id] === 'undefined')
+            {
+                if (lh.nodejsHelperOptions.instance_id > 0) {
+                    channelListMail[mail_id] = socket.subscribe('mail_'+lh.nodejsHelperOptions.instance_id+'_'+ mail_id);
+                } else {
+                    channelListMail[mail_id] = socket.subscribe('mail_' + mail_id);
+                }
+
+                channelListMail[mail_id].on('subscribeFail', function (err) {
+                    console.error('Failed to subscribe to the sample channel due to error: ' + err);
+                });
+
+                channelListMail[mail_id].on('subscribe', function (channelName) {
+                    socket.publish(channelName,{'op':'oo', 'user_id':confLH.user_id, 'name_official': lh.nodejsHelperOptions.name_official }); // Operator sends request to know who is watching
+                });
+
+                channelListMail[mail_id].watch(function (op) {
+                    if (op.op == 'oo') { // Request to know who is viewing the ticket, it has to be not our request
+                        channelListMail[mail_id].publish({'op':'oos','user_id':confLH.user_id, 'name_official': lh.nodejsHelperOptions.name_official});
+                        ee.emitEvent('mail.op_watching', [{id:mail_id, status: true, user_id: op.user_id, name_official: op.name_official}]);
+                        // Add requester itself to our online op list
+                    } else if (op.op == 'opleft' && op.user_id != confLH.user_id) {
+                        ee.emitEvent('mail.op_watching', [{id:mail_id, status: false, user_id: op.user_id}]);
+                    } else if (op.op == 'oos' && op.user_id != confLH.user_id) {
+                        ee.emitEvent('mail.op_watching', [{id:mail_id, status: true, user_id: op.user_id, name_official: op.name_official}]);
+                    }
+                });
+
+                channelListMail[mail_id].monitoring_timeout = setInterval(function() {
+                    channelListMail[mail_id].publish({'op':'oo', user_id:confLH.user_id, name_official: lh.nodejsHelperOptions.name_official});
+                },5000);
+            }
+        } catch (e) {
+            console.log(e);
+        }
+
+    }
+
+
     function connectAdmin(){
         try {
             lhinst.nodeJsMode = true;
@@ -180,6 +240,9 @@ var channelList = [];
             ee.addListener('removeSynchroChat', removeSynchroChatListener);
             ee.addListener('chatAdminSyncOnlineVisitors', onlineVisitors);
             ee.addListener('chatAdminIsOnline', onlineVisitorsCheck);
+
+            ee.addListener('mailChatContentUnLoaded', mailChatContentUnLoaded);
+            ee.addListener('mailChatContentLoaded', mailChatContentLoaded);
 
             confLH.chat_message_sinterval = 15000;
 
