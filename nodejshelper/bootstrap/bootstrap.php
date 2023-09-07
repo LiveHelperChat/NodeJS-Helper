@@ -1,5 +1,5 @@
-<?php 
-
+<?php
+#[\AllowDynamicProperties]
 class erLhcoreClassExtensionNodejshelper {
 
 	public function __construct() {

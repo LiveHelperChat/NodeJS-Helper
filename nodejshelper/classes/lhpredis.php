@@ -1,5 +1,5 @@
 <?php
-
+#[\AllowDynamicProperties]
 class erLhcoreClassNodeJSRedis extends Credis_Client{
 
 	private static $instance = null;
