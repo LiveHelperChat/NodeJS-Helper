@@ -92,7 +92,7 @@ var channelListMail = [];
             return ;
         }
 
-        data.ttx = userDom !== null && userDom.getAttribute('title') ? userDom.getAttribute('title') + lh.nodejsHelperOptions.typer_ending_txt : lh.nodejsHelperOptions.typer;
+        data.ttx = userDom !== null && userDom.getAttribute('title') ? userDom.getAttribute('title') + ' ' + lh.nodejsHelperOptions.typer_ending_txt : lh.nodejsHelperOptions.typer;
         ee.emitEvent('nodeJsTypingOperator', [data]);
         if (lh.nodejsHelperOptions.instance_id > 0) {
             socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+data.chat_id,{'op':'ot','data':data}); // Operator typing

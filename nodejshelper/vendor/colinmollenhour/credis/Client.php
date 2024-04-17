@@ -1414,7 +1414,7 @@ class Credis_Client {
      */
     private static function _prepare_command($args)
     {
-        return sprintf('*%d%s%s%s', count($args), CRLF, implode(CRLF, array_map(array('self', '_map'), $args)), CRLF);
+        return sprintf('*%d%s%s%s', count($args), "\r\n", implode("\r\n", array_map([static::class, '_map'], $args)), "\r\n");
     }
 
     private static function _map($arg)
