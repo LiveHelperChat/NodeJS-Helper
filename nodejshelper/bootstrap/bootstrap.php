@@ -15,11 +15,7 @@ class erLhcoreClassExtensionNodejshelper {
         $dispatcher->listen('onlineuser.update_js_vars',array($this,'proactiveInvitationSend'));
 
         $dispatcher->listen('chat.messages_added_passive', array($this,'messageReceived'));
-        $dispatcher->listen('chat.messages_added_fb', array($this,'messageReceived'));
         $dispatcher->listen('chat.addmsguser', array( $this, 'messageReceived' ));
-
-        $dispatcher->listen('telegram.msg_received', array( $this, 'messageReceived' ));
-        $dispatcher->listen('twilio.sms_received', array( $this,'messageReceived' ));
 
         $dispatcher->listen('chat.visitor_regular_closed', array( $this,'messageReceived' ));
         $dispatcher->listen('chat.explicitly_closed', array( $this,'messageReceived' ));
@@ -175,8 +171,6 @@ class erLhcoreClassExtensionNodejshelper {
 
     public function registerAutoload()
     {
-        include 'extension/nodejshelper/vendor/autoload.php';
-        
         spl_autoload_register(array(
             $this,
             'autoload'
@@ -193,6 +187,7 @@ class erLhcoreClassExtensionNodejshelper {
             include_once $classesArray[$className];
         }
     }
+    
 
 	public function proactiveInvitationSend($params)
     {
