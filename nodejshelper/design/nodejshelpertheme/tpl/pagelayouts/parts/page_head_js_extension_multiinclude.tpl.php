@@ -19,6 +19,7 @@
         $userData = $currentUser->getUserData(true); ?>
         lh.nodejsHelperOptions.typer_ending_txt = <?php echo json_encode(htmlspecialchars_decode(erTranslationClassLhTranslation::getInstance()->getTranslation('chat/chat','is typing now...')));?>;
         lh.nodejsHelperOptions.typer = typeof lh.nodejsHelperOptions.typer !== 'undefined' ? lh.nodejsHelperOptions.typer : '<?php echo htmlspecialchars($userData->name_support,ENT_QUOTES);?> ' + lh.nodejsHelperOptions.typer_ending_txt;
+        lh.nodejsHelperOptions.name_support = <?php echo json_encode($userData->name_support);?>;
         lh.nodejsHelperOptions.name_official = <?php echo json_encode($userData->name_official);?>;
         lh.nodejsHelperOptions.trans = <?php echo json_encode(array(
             'online' => erTranslationClassLhTranslation::getInstance()->getTranslation('chat/adminchat','Visitor online'),
