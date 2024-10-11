@@ -247,41 +247,44 @@ var channelListMail = [];
 
             confLH.chat_message_sinterval = 15000;
 
-            if (lh.nodejsHelperOptions.track_visitors === 1) {
-                onlineUsersChannel = socket.subscribe('ous_'+lh.nodejsHelperOptions.instance_id);
+            onlineUsersChannel = socket.subscribe('ous_'+lh.nodejsHelperOptions.instance_id);
 
-                onlineUsersChannel.on('subscribeFail', function (err) {
-                    console.error('Failed to subscribe to the online users channel due to error: ' + err);
-                });
+            onlineUsersChannel.on('subscribeFail', function (err) {
+                console.error('Failed to subscribe to the online users channel due to error: ' + err);
+            });
 
-                onlineUsersChannel.watch(function (op) {
-                    if (op.op == 'vi_online') {
-                        var elm = document.getElementById('uo-vid-'+op.vid);
-                        if (elm !== null) {
-                            if (op.status === true) {
-                                elm.classList.add('online_user');
-                                document.getElementById('ou-face-'+op.vid).classList.add('icon-user-online');
-                            } else {
-                                elm.classList.remove('online_user');
-                                elm.classList.remove('recent_visit');
-                                document.getElementById('ou-face-'+op.vid).classList.remove('icon-user-online');
-                            }
-                        }
-
-                        var elm = document.getElementById('mass-uo-vid-'+op.vid);
-                        if (elm !== null) {
-                            if (op.status === true) {
-                                elm.classList.add('online_user');
-                                document.getElementById('mass-ou-face-'+op.vid).classList.add('icon-user-online');
-                            } else {
-                                elm.classList.remove('online_user');
-                                elm.classList.remove('recent_visit');
-                                document.getElementById('mass-ou-face-'+op.vid).classList.remove('icon-user-online');
-                            }
+            onlineUsersChannel.watch(function (op) {
+                if (op.op == 'vi_online') {
+                    var elm = document.getElementById('uo-vid-'+op.vid);
+                    if (elm !== null) {
+                        if (op.status === true) {
+                            elm.classList.add('online_user');
+                            document.getElementById('ou-face-'+op.vid).classList.add('icon-user-online');
+                        } else {
+                            elm.classList.remove('online_user');
+                            elm.classList.remove('recent_visit');
+                            document.getElementById('ou-face-'+op.vid).classList.remove('icon-user-online');
                         }
                     }
-                });
-            }
+
+                    var elm = document.getElementById('mass-uo-vid-'+op.vid);
+                    if (elm !== null) {
+                        if (op.status === true) {
+                            elm.classList.add('online_user');
+                            document.getElementById('mass-ou-face-'+op.vid).classList.add('icon-user-online');
+                        } else {
+                            elm.classList.remove('online_user');
+                            elm.classList.remove('recent_visit');
+                            document.getElementById('mass-ou-face-'+op.vid).classList.remove('icon-user-online');
+                        }
+                    }
+                } else if (op.op == 'notice_updated') {
+                    ee.emitEvent('svelteNoticeUpdated', []);
+                } else if (op.op == 'reload_page') {
+                    document.location.reload();
+                }
+            });
+
 
             ee.emitEvent('socketConnected', [socket]);
         } catch (e) {

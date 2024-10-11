@@ -36,7 +36,9 @@ class erLhcoreClassExtensionNodejshelper {
         $dispatcher->listen('chat.update_main_attr', array( $this,'statusChange' ));
         $dispatcher->listen('chat.close', array( $this,'chatClose' ));
         $dispatcher->listen('chat.genericbot_chat_command_transfer', array( $this,'statusChange' ));
-        
+        $dispatcher->listen('chat.notice_update', array( $this,'noticeUpdated' ));
+        $dispatcher->listen('chat.reload_backoffice', array( $this,'reloadBackOffice' ));
+
         // React based widget init calls
         $dispatcher->listen('widgetrestapi.initchat', array( $this,'initChat' ));
         $dispatcher->listen('widgetrestapi.settings', array( $this,'initOnlineVisitor' ));
@@ -268,6 +270,24 @@ class erLhcoreClassExtensionNodejshelper {
             erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('op' => 'cclose', 'nick' => mb_substr($params['chat']->nick,0,10))));
         } else {
             erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('op' => 'cclose', 'nick' => mb_substr($params['chat']->nick,0,10))));
+        }
+    }
+    
+    public function noticeUpdated()
+    {
+        if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) {
+            erLhcoreClassNodeJSRedis::instance()->publish('ous_' . erLhcoreClassInstance::getInstance()->id,'o:' . json_encode(array('op' => 'notice_updated')));
+        } else {
+            erLhcoreClassNodeJSRedis::instance()->publish('ous_0','o:' . json_encode(array('op' => 'notice_updated')));
+        }
+    }
+
+    public function reloadBackOffice()
+    {
+        if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')) {
+            erLhcoreClassNodeJSRedis::instance()->publish('ous_' . erLhcoreClassInstance::getInstance()->id,'o:' . json_encode(array('op' => 'reload_page')));
+        } else {
+            erLhcoreClassNodeJSRedis::instance()->publish('ous_0','o:' . json_encode(array('op' => 'reload_page')));
         }
     }
 
