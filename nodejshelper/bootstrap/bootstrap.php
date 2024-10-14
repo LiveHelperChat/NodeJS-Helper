@@ -30,6 +30,7 @@ class erLhcoreClassExtensionNodejshelper {
         $dispatcher->listen('chat.message_updated', array( $this,'messageUpdated' ));
         $dispatcher->listen('chat.reaction_visitor', array( $this,'messageUpdated' ));
         $dispatcher->listen('chat.reaction_operator', array( $this,'messageUpdated' ));
+        $dispatcher->listen('chat.msg_removed', array( $this,'messageUpdated' ));
 
         // Chat was accepted.
         $dispatcher->listen('chat.accept', array( $this,'statusChange' ));
