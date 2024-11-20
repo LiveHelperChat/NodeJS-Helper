@@ -22,6 +22,7 @@ class erLhcoreClassExtensionNodejshelper {
         $dispatcher->listen('chat.data_changed_chat', array( $this,'messageReceived' ));
         $dispatcher->listen('chat.screenshot_ready', array( $this,'messageReceived' ));
 
+        $dispatcher->listen('chat.stream_flow', array( $this,'streamFlow' ));
         $dispatcher->listen('chat.web_add_msg_admin', array( $this,'messageReceivedAdmin' ));
         $dispatcher->listen('chat.added_operation', array( $this,'messageReceivedAdmin' ));
         $dispatcher->listen('chat.chatwidgetchat', array( $this,'messageReceived' ));
@@ -121,6 +122,16 @@ class erLhcoreClassExtensionNodejshelper {
             default:
                 ;
                 break;
+        }
+    }
+
+
+
+    public function streamFlow($params) {
+        if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')){
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('msg' => $params['response']['content'], 'op' => 'sflow')));
+        } else {
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('msg' => $params['response']['content'], 'op' => 'sflow')));
         }
     }
 
