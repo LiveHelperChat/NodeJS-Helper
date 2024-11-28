@@ -125,13 +125,11 @@ class erLhcoreClassExtensionNodejshelper {
         }
     }
 
-
-
     public function streamFlow($params) {
         if (erLhcoreClassModule::getExtensionInstance('erLhcoreClassExtensionNodejshelper')->getSettingVariable('automated_hosting')){
-            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('msg' => $params['response']['content'], 'op' => 'sflow')));
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . erLhcoreClassInstance::getInstance()->id . '_' . $params['chat']->id,'o:' . json_encode(array('as_html' => (isset($params['as_html']) && $params['as_html'] === true),'msg' => str_replace('/','__SL__',$params['response']['content']), 'op' => 'sflow')));
         } else {
-            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('msg' => $params['response']['content'], 'op' => 'sflow')));
+            erLhcoreClassNodeJSRedis::instance()->publish('chat_' . $params['chat']->id,'o:' . json_encode(array('as_html' => (isset($params['as_html']) && $params['as_html'] === true), 'msg' => str_replace('/','__SL__',$params['response']['content']), 'op' => 'sflow')));
         }
     }
 
