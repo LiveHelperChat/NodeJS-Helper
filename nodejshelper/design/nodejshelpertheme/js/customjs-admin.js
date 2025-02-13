@@ -73,6 +73,8 @@ var channelListMail = [];
                     } else if (op.op == 'vi_online') { // Visitor has send a message
                         typingIndicator.html('<span id="node-js-indicator-'+chat_id+'" class="fs12 '+(op.status == true ? 'text-success' : 'text-danger')+'"><span class="material-icons fs12">'+(op.status == true ? 'wifi' : 'wifi_off')+'</span><span class="node-js-online-status">'+(op.status == true ? lh.nodejsHelperOptions.trans.online : lh.nodejsHelperOptions.trans.offline)+'</span></span>').css('visibility','visible');
                         ee.emitEvent('nodeJsVisitorStatus', [{id:chat_id, status: op.status}]);
+                    } else if (op.op == 'uchat') {
+                        ee.emitEvent('updateChatTab', [{id:chat_id}]);
                     } else if (op.op == 'schange') {
                         lhinst.updateVoteStatus(chat_id);
                     } else if (op.op == 'cclose') {
