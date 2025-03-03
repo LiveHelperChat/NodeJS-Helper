@@ -33,10 +33,11 @@ setTimeout(function() {
 
     function visitorTypingListener(data)
     {
+        let typingText = lh.nodejsHelperOptions.hide_typing ? lh.nodejsHelperOptions.typing_text : data.msg;
         if (lh.nodejsHelperOptions.instance_id > 0) {
-            socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id,{'op':'vt','msg':data.msg});
+            socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+lhinst.chat_id,{'op':'vt','msg':typingText});
         } else {
-            socket.publish('chat_'+lhinst.chat_id,{'op':'vt','msg':data.msg});
+            socket.publish('chat_'+lhinst.chat_id,{'op':'vt','msg':typingText});
         }
     }
 
