@@ -287,6 +287,7 @@ var channelListMail = [];
                 }
             });
 
+            lh.nodejsHelperOptions.socketConnected = true;
 
             ee.emitEvent('socketConnected', [socket]);
         } catch (e) {
