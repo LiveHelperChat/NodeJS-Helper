@@ -34,6 +34,14 @@ var channelListMail = [];
         console.error(err);
     });
 
+    function tabActivated(chat_id) {
+        if (lh.nodejsHelperOptions.instance_id > 0) {
+            socket.publish('chat_'+lh.nodejsHelperOptions.instance_id+'_'+chat_id,{'op':'msg_del', 'hum':0});
+        } else{
+            socket.publish('chat_'+chat_id,{'op':'msg_del','hum':0});
+        }
+    }
+
     function addChatToNodeJS(chat_id) {
         try {
             if (typeof channelList[chat_id] === 'undefined')
@@ -161,6 +169,7 @@ var channelListMail = [];
             ee.removeListener('chatTabMonitor', addChatToNodeJS);
             ee.removeListener('operatorTyping', operatorTypingListener);
             ee.removeListener('removeSynchroChat', removeSynchroChatListener);
+            ee.removeListener('chatTabClicked', tabActivated);
 
             confLH.chat_message_sinterval = confLH.defaut_chat_message_sinterval;
 
@@ -237,6 +246,7 @@ var channelListMail = [];
                 addChatToNodeJS(chat_id);
             });
 
+            ee.addListener('chatTabClicked', tabActivated);
             ee.addListener('chatTabMonitor', addChatToNodeJS);
             ee.addListener('chatTabLoaded', addChatToNodeJS);
             ee.addListener('operatorTyping', operatorTypingListener);

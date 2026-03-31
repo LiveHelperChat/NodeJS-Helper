@@ -35,6 +35,10 @@ class erLhcoreClassExtensionNodejshelper
             $dispatcher->listen($event, array($this, 'messageReceivedAdmin'));
         }
 
+        foreach (['chat.vi_msg_delivered'] as $event) {
+            $dispatcher->listen($event, array($this, 'visitorMessageDelivered'));
+        }
+
         $dispatcher->listen('chat.bot.alert_icon', array($this, 'chatAttributeUpdate'));
 
         foreach (['chat.message_updated', 'chat.reaction_visitor', 'chat.reaction_operator', 'chat.msg_removed'] as $event) {
@@ -148,6 +152,11 @@ class erLhcoreClassExtensionNodejshelper
         } else {
             $this->updateAdminUI($params['chat']->id, ['op' => 'cmsg']);
         }
+    }
+
+    public function visitorMessageDelivered($params)
+    {
+        $this->updateAdminUI($params['chat']->id, ['op' => 'msg_del', 'hum' => $params['chat']->has_unread_messages]);
     }
 
     public function chatAttributeUpdate($params)
