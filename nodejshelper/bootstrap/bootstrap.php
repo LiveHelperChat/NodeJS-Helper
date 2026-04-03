@@ -31,7 +31,7 @@ class erLhcoreClassExtensionNodejshelper
 
         $dispatcher->listen('chat.stream_flow', array($this, 'streamFlow'));
 
-        foreach (['chat.web_add_msg_admin', 'chat.added_operation'] as $event) {
+        foreach (['chat.web_add_msg_admin', 'chat.added_operation', 'chat.stream_chunk_finished'] as $event) {
             $dispatcher->listen($event, array($this, 'messageReceivedAdmin'));
         }
 
