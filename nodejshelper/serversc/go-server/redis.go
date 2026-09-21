@@ -1,10 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
-	"errors"
 	"log"
 	"net"
 	"strconv"
@@ -12,9 +11,34 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
-// redisBridge is a dependency free replacement for node_modules/sc-redis.
+// Timeouts and intervals of the two Redis clients.
+const (
+	// publishTimeout bounds one PUBLISH, dial included. Publishes run in the socket
+	// goroutine that received the event, so this is also how long an unreachable
+	// Redis may stall that connection (the hand written client dialled with a 5s
+	// timeout and then retried once, holding it for up to ~10s).
+	publishTimeout = 2 * time.Second
+
+	// subscribeTimeout bounds a SUBSCRIBE/UNSUBSCRIBE, which also comes from a socket
+	// goroutine (first and last subscriber of a channel).
+	subscribeTimeout = 2 * time.Second
+
+	// redisProbeInterval is how long the subscription may stay quiet before a PING is
+	// written to it. The same value go-redis uses for its own Channel() health check.
+	redisProbeInterval = 3 * time.Second
+
+	// redisProbeTimeout bounds that PING.
+	redisProbeTimeout = 5 * time.Second
+)
+
+// redisBridge replaces node_modules/sc-redis. The wire format is unchanged (see
+// below); only the connection layer is delegated now - to go-redis, which owns RESP
+// parsing, dialing, reconnection and re-subscribing. That was the part of this file
+// that used to be hand written.
 //
 // Original behaviour (node_modules/sc-redis/index.js):
 //
@@ -25,11 +49,17 @@ import (
 // Messages published by Live Helper Chat (extension/nodejshelper/classes/lhpredis.php)
 // look exactly like that, e.g. `o:{"op":"cmsg"}`.
 type redisBridge struct {
-	host       string
-	port       int
-	pass       string
-	db         int
 	instanceID string
+
+	// publisher serves PUBLISH. It is a small pool with tight timeouts, so one slow
+	// publish cannot serialise the others (the old code used a single connection
+	// behind a mutex, and a retry that could publish twice).
+	publisher *redis.Client
+
+	// subscriber is the one dedicated PubSub connection for every channel that has
+	// local subscribers. PubSub keeps the channel set itself and re-subscribes all of
+	// it after a reconnect - including channels that were added while Redis was down.
+	subscriber *redis.PubSub
 
 	// deliver is called for messages coming from Redis. It only fans out to
 	// local sockets - it never publishes back to Redis (sc-simple-broker did
@@ -37,31 +67,67 @@ type redisBridge struct {
 	deliver func(channel string, data json.RawMessage)
 
 	mu         sync.Mutex
-	subConn    net.Conn
-	subWriter  *bufio.Writer
 	subscribed map[string]struct{}
 	lastError  string
 	lastLog    time.Time
 
-	// connected tracks the subscription connection, it backs /health-check.
-	connected atomic.Bool
+	// lastActivityNs is when a reply was last read, lastErrorNs when a connection
+	// level failure last happened. Health means "a reply arrived after the last
+	// failure", so a write that the kernel merely buffered can never make the bridge
+	// look healthy - see Healthy().
+	lastActivityNs atomic.Int64
+	lastErrorNs    atomic.Int64
 
-	pubMu     sync.Mutex
-	pubConn   net.Conn
-	pubReader *bufio.Reader
-	pubWriter *bufio.Writer
+	// awaitingConnectLog makes the next reply log a "connected" line: it starts set,
+	// and every failure sets it again (the hand written client logged each reconnect).
+	awaitingConnectLog atomic.Bool
 }
 
-func newRedisBridge(host string, port int, pass string, db int, instanceID string, deliver func(string, json.RawMessage)) *redisBridge {
-	return &redisBridge{
-		host:       host,
-		port:       port,
-		pass:       pass,
-		db:         db,
+func newRedisBridge(host string, port int, user, pass string, db int, instanceID string, deliver func(string, json.RawMessage)) *redisBridge {
+	// Shared by both clients.
+	options := &redis.Options{
+		Addr:     net.JoinHostPort(host, strconv.Itoa(port)),
+		Username: user,
+		Password: pass,
+		DB:       db,
+		// RESP2 on purpose: it is what the hand written client spoke, needs no HELLO
+		// handshake and works on every Redis version Live Helper Chat supports, while
+		// RESP3 would deliver PubSub replies as push messages.
+		Protocol: 2,
+		// No command retries - recovery belongs to the loops below, and a retry would
+		// only delay the error the caller has to handle anyway.
+		MaxRetries: -1,
+		// One dial attempt instead of the default five (which add 100ms of backoff
+		// each, and seconds per attempt when a host black holes the connection).
+		DialerRetries: 1,
+		DialTimeout:   2 * time.Second,
+	}
+
+	publishOptions := *options
+	publishOptions.PoolSize = 8
+	publishOptions.ReadTimeout = publishTimeout
+	publishOptions.WriteTimeout = publishTimeout
+
+	subscribeOptions := *options
+	// Zero on purpose: an idle subscription blocks in a read, and a read timeout is
+	// classified as a broken connection by go-redis, which would turn every quiet
+	// period into a reconnect. probeLoop() checks liveness instead.
+	subscribeOptions.ReadTimeout = 0
+	subscribeOptions.WriteTimeout = subscribeTimeout
+
+	b := &redisBridge{
 		instanceID: instanceID,
+		publisher:  redis.NewClient(&publishOptions),
 		deliver:    deliver,
 		subscribed: make(map[string]struct{}),
 	}
+	b.awaitingConnectLog.Store(true)
+
+	// Client.Subscribe() only sends SUBSCRIBE when channels are given, so this creates
+	// the PubSub without connecting yet - receiveLoop()/probeLoop() dial it.
+	b.subscriber = redis.NewClient(&subscribeOptions).Subscribe(context.Background())
+
+	return b
 }
 
 func nextBackoff(current time.Duration) time.Duration {
@@ -143,146 +209,122 @@ func (b *redisBridge) clearError() {
 	b.mu.Unlock()
 }
 
-func (b *redisBridge) dial() (net.Conn, *bufio.Reader, *bufio.Writer, error) {
-	address := net.JoinHostPort(b.host, strconv.Itoa(b.port))
-	conn, err := net.DialTimeout("tcp", address, 5*time.Second)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// One reader per connection: bufio may buffer more than the current reply, so it
-	// has to stay with the connection for its whole life.
-	reader := bufio.NewReader(conn)
-	writer := bufio.NewWriter(conn)
-
-	commands := 0
-	if b.pass != "" {
-		if err := writeCommand(writer, "AUTH", b.pass); err != nil {
-			conn.Close()
-			return nil, nil, nil, err
-		}
-		commands++
-	}
-	if b.db != 0 {
-		if err := writeCommand(writer, "SELECT", strconv.Itoa(b.db)); err != nil {
-			conn.Close()
-			return nil, nil, nil, err
-		}
-		commands++
-	}
-	// PING proves Redis accepted us, so a protected-mode or auth refusal is reported
-	// as such instead of a bogus "connected" line.
-	if err := writeCommand(writer, "PING"); err != nil {
-		conn.Close()
-		return nil, nil, nil, err
-	}
-	commands++
-
-	if err := writer.Flush(); err != nil {
-		conn.Close()
-		return nil, nil, nil, err
-	}
-
-	for i := 0; i < commands; i++ {
-		if _, err := readRESP(reader); err != nil {
-			conn.Close()
-			return nil, nil, nil, err
-		}
-	}
-
-	return conn, reader, writer, nil
+// noteError records a connection level failure: it is logged through reportError()
+// (deduplicated) and makes Healthy() false until a reply arrives again.
+func (b *redisBridge) noteError(err error) {
+	b.awaitingConnectLog.Store(true)
+	b.lastErrorNs.Store(time.Now().UnixNano())
+	b.reportError(err)
 }
 
-// Start launches the subscriber loop. It reconnects on its own and re-subscribes
-// every channel that currently has local subscribers.
+// markActivity records a reply from Redis - a message, a subscribe confirmation or the
+// pong of a health ping. Any of them proves the connection works.
+func (b *redisBridge) markActivity() {
+	b.lastActivityNs.Store(time.Now().UnixNano())
+
+	if b.awaitingConnectLog.Swap(false) {
+		b.mu.Lock()
+		channels := len(b.subscribed)
+		b.mu.Unlock()
+
+		log.Printf("[redis] connected, subscribed to %d channel(s)", channels)
+	}
+}
+
+// Start launches the reader and the health probe. Both run for the lifetime of the
+// process and reconnect on their own.
 func (b *redisBridge) Start() {
-	go b.subscribeLoop()
+	go b.receiveLoop()
+	go b.probeLoop()
 }
 
-func (b *redisBridge) subscribeLoop() {
+// receiveLoop reads replies and hands PubSub messages to deliver.
+//
+// Deliberately a single goroutine, like before: deliver() fans out to local sockets
+// and must not run concurrently with itself. Receive() is used instead of
+// PubSub.Channel() so that a slow fan out (see the note on Hub.PublishLocal) applies
+// back pressure instead of dropping messages that do not fit in a buffer for a
+// minute.
+//
+// Reconnecting does not happen here: a failed read closes the connection inside
+// go-redis, and the next Receive() dials again and re-subscribes every channel it has
+// on record. This loop only slows the retries down.
+func (b *redisBridge) receiveLoop() {
 	backoff := time.Second
 
 	for {
-		conn, reader, writer, err := b.dial()
+		reply, err := b.subscriber.Receive(context.Background())
 		if err != nil {
-			b.connected.Store(false)
-			b.reportError(err)
+			b.noteError(err)
+
+			if isRedisConfigError(err) {
+				time.Sleep(configErrorRetryDelay)
+				continue
+			}
+
 			time.Sleep(backoff)
 			backoff = nextBackoff(backoff)
 			continue
 		}
+
 		backoff = time.Second
 
-		b.mu.Lock()
-		b.subConn = conn
-		b.subWriter = writer
-		channels := make([]string, 0, len(b.subscribed))
-		for channel := range b.subscribed {
-			channels = append(channels, channel)
+		b.markActivity()
+
+		if msg, ok := reply.(*redis.Message); ok {
+			b.handleMessage(msg.Channel, msg.Payload)
 		}
-		for _, channel := range channels {
-			_ = writeCommand(writer, "SUBSCRIBE", channel)
-		}
-		flushErr := writer.Flush()
-		b.mu.Unlock()
-
-		if flushErr != nil {
-			b.connected.Store(false)
-			b.reportError(flushErr)
-			conn.Close()
-			continue
-		}
-
-		if !b.connected.Swap(true) {
-			log.Printf("[redis] connected, subscribed to %d channel(s)", len(channels))
-		}
-		b.clearError()
-
-		var configErr error
-		for {
-			reply, err := readRESP(reader)
-			if err != nil {
-				configErr = err
-				b.connected.Store(false)
-				b.reportError(err)
-				conn.Close()
-
-				b.mu.Lock()
-				b.subConn = nil
-				b.subWriter = nil
-				b.mu.Unlock()
-				break
-			}
-
-			// PubSub messages arrive as `*3` arrays of bulk strings:
-			// ["message", <channel>, <payload>]
-			parts, ok := reply.([]any)
-			if !ok || len(parts) < 3 {
-				continue // subscribe/unsubscribe confirmations and the like
-			}
-			if respString(parts[0]) != "message" {
-				continue
-			}
-			channel := respString(parts[1])
-			payload := respBytes(parts[2])
-			b.handleMessage(channel, string(payload))
-		}
-
-		if isRedisConfigError(configErr) {
-			time.Sleep(configErrorRetryDelay)
-			continue
-		}
-
-		time.Sleep(backoff)
-		backoff = nextBackoff(backoff)
 	}
 }
 
-// Healthy reports whether the Redis subscription connection is up. /health-check
-// uses it so a broken bridge shows up as a failing container instead of silently
-// swallowing every message that PHP publishes.
+// probeLoop keeps an idle connection honest. While replies keep arriving nothing is
+// checked - traffic is the best health signal there is - but after
+// redisProbeInterval of silence a PING is written, which is what notices a connection
+// that died without the kernel telling the blocked reader about it.
+//
+// go-redis does exactly this for its own Channel() API (checkInterval/pingTimeout).
+func (b *redisBridge) probeLoop() {
+	// Immediately once, so /health-check (and the "connected" log line) does not have
+	// to wait for the first interval, then every redisProbeInterval.
+	b.probe()
+
+	ticker := time.NewTicker(redisProbeInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		b.probe()
+	}
+}
+
+// probe writes a PING when the connection has been quiet for redisProbeInterval.
+func (b *redisBridge) probe() {
+	if time.Since(time.Unix(0, b.lastActivityNs.Load())) < redisProbeInterval {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), redisProbeTimeout)
+	err := b.subscriber.Ping(ctx)
+	cancel()
+
+	if err != nil {
+		b.noteError(err)
+		return
+	}
+
+	// A working connection logs again after an outage instead of staying
+	// suppressed by reportError().
+	b.clearError()
+}
+
+// Healthy reports whether Redis is reachable and the subscription is being served.
+// /health-check uses it so a broken bridge shows up as a failing container instead of
+// silently swallowing every message that PHP publishes.
+//
+// Only a reply counts: a successful write can be no more than the local socket buffer
+// accepting bytes, which is exactly what happens when the peer is gone.
 func (b *redisBridge) Healthy() bool {
-	return b.connected.Load()
+	activity := b.lastActivityNs.Load()
+	return activity != 0 && activity > b.lastErrorNs.Load()
 }
 
 // EnsureSubscribed mirrors sc-redis' `broker.on('subscribe')` hook.
@@ -293,19 +335,16 @@ func (b *redisBridge) EnsureSubscribed(channel string) {
 		return
 	}
 	b.subscribed[channel] = struct{}{}
-	writer := b.subWriter
-	if writer == nil {
-		b.mu.Unlock()
-		return // reconnect handler will SUBSCRIBE it
-	}
-	err := writeCommand(writer, "SUBSCRIBE", channel)
-	if err == nil {
-		err = writer.Flush()
-	}
 	b.mu.Unlock()
 
-	if err != nil {
-		log.Printf("[redis] SUBSCRIBE %s failed: %v", channel, err)
+	ctx, cancel := context.WithTimeout(context.Background(), subscribeTimeout)
+	defer cancel()
+
+	// PubSub records the channel even when the command fails, so a subscription that
+	// arrives while Redis is down is replayed on the next successful connect - that is
+	// what replaced the manual reconnect bookkeeping.
+	if err := b.subscriber.Subscribe(ctx, channel); err != nil {
+		b.noteError(err)
 	}
 }
 
@@ -317,80 +356,32 @@ func (b *redisBridge) EnsureUnsubscribed(channel string) {
 		return
 	}
 	delete(b.subscribed, channel)
-	writer := b.subWriter
-	if writer == nil {
-		b.mu.Unlock()
-		return
-	}
-	err := writeCommand(writer, "UNSUBSCRIBE", channel)
-	if err == nil {
-		err = writer.Flush()
-	}
 	b.mu.Unlock()
 
-	if err != nil {
-		log.Printf("[redis] UNSUBSCRIBE %s failed: %v", channel, err)
+	ctx, cancel := context.WithTimeout(context.Background(), subscribeTimeout)
+	defer cancel()
+
+	// The channel always has to be named here: PubSub.Unsubscribe() without arguments
+	// drops every subscription, not just this one.
+	if err := b.subscriber.Unsubscribe(ctx, channel); err != nil {
+		b.noteError(err)
 	}
 }
 
 // Publish mirrors sc-redis' `broker.on('publish')` hook.
 func (b *redisBridge) Publish(channel string, data json.RawMessage) {
 	payload := encodeForRedis(b.instanceID, data)
-	if err := b.writePublish(channel, payload); err != nil {
-		log.Printf("[redis] PUBLISH %s failed: %v", channel, err)
+
+	// Bounded, and without a retry, so an unreachable Redis cannot hold the calling
+	// socket goroutine - the pool re-establishes the connection on its own.
+	ctx, cancel := context.WithTimeout(context.Background(), publishTimeout)
+	defer cancel()
+
+	if err := b.publisher.Publish(ctx, channel, payload).Err(); err != nil {
+		// Not logged per channel: when Redis is down every publish fails, and
+		// noteError() already deduplicates the message to once a minute.
+		b.noteError(err)
 	}
-}
-
-func (b *redisBridge) writePublish(channel, payload string) error {
-	b.pubMu.Lock()
-	defer b.pubMu.Unlock()
-
-	err := b.sendPublishLocked(channel, payload)
-	if err == nil {
-		return nil
-	}
-
-	// Retry once with a fresh connection - the previous one may have been idle
-	// for too long and dropped by Redis.
-	if b.pubConn != nil {
-		b.pubConn.Close()
-		b.pubConn = nil
-		b.pubReader = nil
-		b.pubWriter = nil
-	}
-
-	if err := b.sendPublishLocked(channel, payload); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (b *redisBridge) sendPublishLocked(channel, payload string) error {
-	if b.pubConn == nil {
-		conn, reader, writer, err := b.dial()
-		if err != nil {
-			return err
-		}
-		b.pubConn = conn
-		b.pubReader = reader
-		b.pubWriter = writer
-	}
-
-	// Bound the round trip so a hung Redis cannot block a socket goroutine forever.
-	_ = b.pubConn.SetDeadline(time.Now().Add(5 * time.Second))
-	defer func() { _ = b.pubConn.SetDeadline(time.Time{}) }()
-
-	if err := writeCommand(b.pubWriter, "PUBLISH", channel, payload); err != nil {
-		return err
-	}
-	if err := b.pubWriter.Flush(); err != nil {
-		return err
-	}
-
-	// Consume the `:N` reply - otherwise replies pile up on this connection until
-	// Redis hits its client output buffer limit.
-	_, err := readRESP(b.pubReader)
-	return err
 }
 
 // handleMessage decodes one Redis message the same way sc-redis did, with one
@@ -477,122 +468,4 @@ func encodeForRedis(instanceID string, data json.RawMessage) string {
 	}
 
 	return payload
-}
-
-// --- minimal RESP client -----------------------------------------------------
-
-var errRESP = errors.New("redis: protocol error")
-
-func writeCommand(writer *bufio.Writer, args ...string) error {
-	if _, err := writer.WriteString("*" + strconv.Itoa(len(args)) + "\r\n"); err != nil {
-		return err
-	}
-	for _, arg := range args {
-		if _, err := writer.WriteString("$" + strconv.Itoa(len(arg)) + "\r\n"); err != nil {
-			return err
-		}
-		if _, err := writer.WriteString(arg + "\r\n"); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func readLine(reader *bufio.Reader) (string, error) {
-	line, err := reader.ReadString('\n')
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimRight(line, "\r\n"), nil
-}
-
-// readRESP parses one reply. Bulk strings are returned as []byte, arrays as
-// []any, integers as int64 and simple strings as string.
-func readRESP(reader *bufio.Reader) (any, error) {
-	line, err := readLine(reader)
-	if err != nil {
-		return nil, err
-	}
-	if len(line) == 0 {
-		return nil, errRESP
-	}
-
-	switch line[0] {
-	case '+':
-		return line[1:], nil
-	case '-':
-		return nil, errors.New("redis: " + line[1:])
-	case ':':
-		n, err := strconv.ParseInt(line[1:], 10, 64)
-		if err != nil {
-			return nil, errRESP
-		}
-		return n, nil
-	case '$':
-		size, err := strconv.Atoi(line[1:])
-		if err != nil {
-			return nil, errRESP
-		}
-		if size < 0 {
-			return nil, nil
-		}
-		buf := make([]byte, size+2)
-		if _, err := readFull(reader, buf); err != nil {
-			return nil, err
-		}
-		return buf[:size], nil
-	case '*':
-		count, err := strconv.Atoi(line[1:])
-		if err != nil {
-			return nil, errRESP
-		}
-		if count < 0 {
-			return nil, nil
-		}
-		items := make([]any, 0, count)
-		for i := 0; i < count; i++ {
-			item, err := readRESP(reader)
-			if err != nil {
-				return nil, err
-			}
-			items = append(items, item)
-		}
-		return items, nil
-	default:
-		return nil, errRESP
-	}
-}
-
-func readFull(reader *bufio.Reader, buf []byte) (int, error) {
-	total := 0
-	for total < len(buf) {
-		n, err := reader.Read(buf[total:])
-		total += n
-		if err != nil {
-			return total, err
-		}
-	}
-	return total, nil
-}
-
-// respString converts a parsed RESP scalar to a string. Depending on the reply
-// type Redis uses either a simple string (`+`) or a bulk string (`$`).
-func respString(value any) string {
-	switch typed := value.(type) {
-	case string:
-		return typed
-	case []byte:
-		return string(typed)
-	}
-	return ""
-}
-
-func respBytes(value any) []byte {
-	switch typed := value.(type) {
-	case []byte:
-		return typed
-	case string:
-		return []byte(typed)
-	}
-	return nil
 }

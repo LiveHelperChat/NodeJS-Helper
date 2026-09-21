@@ -28,7 +28,7 @@ type Server struct {
 func newServer(cfg *Config) *Server {
 	srv := &Server{cfg: cfg, hub: newHub(), sockets: make(map[*Socket]struct{})}
 
-	srv.bridge = newRedisBridge(cfg.RedisHost, cfg.RedisPort, cfg.RedisPass, cfg.RedisDB, cfg.InstanceID,
+	srv.bridge = newRedisBridge(cfg.RedisHost, cfg.RedisPort, cfg.RedisUser, cfg.RedisPass, cfg.RedisDB, cfg.InstanceID,
 		func(channel string, data json.RawMessage) {
 			// Messages coming from Redis are only fanned out locally - they are
 			// never published back to Redis (this is what keeps the bridge from

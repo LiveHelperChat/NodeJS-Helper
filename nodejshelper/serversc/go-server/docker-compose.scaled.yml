@@ -47,6 +47,7 @@ x-app-env: &app-env
   REDIS_HOST: redis
   REDIS_PORT: "6379"
   REDIS_PASS: "${REDIS_PASS:-}"
+  REDIS_USER: "${REDIS_USER:-}"
   REDIS_DB: "${REDIS_DB:-0}"
   # SC_INSTANCE_ID is intentionally not set: each process generates a unique random id,
   # which is what makes a node ignore only its own Redis echoes.

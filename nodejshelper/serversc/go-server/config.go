@@ -41,6 +41,7 @@ type Config struct {
 	// Redis (server.js `brokerOptions` + sc-redis)
 	RedisHost  string // REDIS_HOST
 	RedisPort  int    // REDIS_PORT
+	RedisUser  string // REDIS_USER - ACL user name (Redis 6+), empty = `default`
 	RedisPass  string // REDIS_PASS
 	RedisDB    int    // REDIS_DB
 	InstanceID string // SC_INSTANCE_ID - node id used as the sc-redis message prefix
@@ -135,6 +136,7 @@ func loadConfig() *Config {
 		AllowClientPublish: envBool("ALLOW_CLIENT_PUBLISH", true),
 		RedisHost:          envStr("REDIS_HOST", "127.0.0.1"),
 		RedisPort:          envInt("REDIS_PORT", 6379),
+		RedisUser:          envStr("REDIS_USER", ""),
 		RedisPass:          envStr("REDIS_PASS", ""),
 		RedisDB:            envInt("REDIS_DB", 0),
 		InstanceID:         defaultInstanceID(),

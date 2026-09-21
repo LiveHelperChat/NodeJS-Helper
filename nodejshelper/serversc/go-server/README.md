@@ -1,8 +1,13 @@
 # LHC NodeJS Helper server (Go)
 
-A dependency free, single binary replacement for the SocketCluster stack that used
-to live in `serversc/lhc` (`server.js` master + `worker.js` workers + `broker.js`
-brokers + `sc-redis`).
+A single binary replacement for the SocketCluster stack that used to live in
+`serversc/lhc` (`server.js` master + `worker.js` workers + `broker.js` brokers +
+`sc-redis`).
+
+Its only third party dependency is `github.com/redis/go-redis/v9`, the Redis client
+maintained by Redis itself, and it is vendored in `vendor/`. Both `go build` and the
+Docker build use that copy, so neither needs the network (`go.mod` therefore asks for
+Go 1.24 or newer).
 
 Nothing changes for Live Helper Chat itself:
 
@@ -16,7 +21,7 @@ Nothing changes for Live Helper Chat itself:
 
 ```bash
 cd extension/nodejshelper/serversc/new-server
-go build -o lhcnodejs .
+go build -o lhcnodejs .     # builds from vendor/ (Go >= 1.24), no network needed
 SECRET_HASH="$(your site.secrethash)" REDIS_HOST=127.0.0.1 ./lhcnodejs
 ```
 
@@ -55,6 +60,7 @@ REDIS_HOST=host.docker.internal   # a Redis on this machine (host-gateway is con
 #REDIS_HOST=10.0.0.5              # ...or on another machine
 #REDIS_PORT=6379
 #REDIS_PASS=
+#REDIS_USER=                      # only for Redis 6+ ACL users, otherwise `default` is used
 ```
 
 That Redis has to accept connections from the container network, which is not the default

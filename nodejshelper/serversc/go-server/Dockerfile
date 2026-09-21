@@ -1,12 +1,17 @@
-# Build stage - the server has no third party dependencies, so this works offline.
-FROM golang:1.23-alpine AS build
+# Build stage. Everything it needs is in the repository (go.mod, go.sum and the vendored
+# copy of go-redis), so no module is downloaded here and the build works offline.
+# The Go image has to satisfy the `go` directive in go.mod (go-redis needs >= 1.24).
+FROM golang:1.26-alpine AS build
 
 WORKDIR /src
 
-COPY go.mod ./
+COPY go.mod go.sum ./
+COPY vendor/ ./vendor/
 COPY *.go ./
 
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/lhcnodejs .
+# -mod=vendor makes the vendored copy authoritative, so a stale module cache or an
+# inherited GOFLAGS cannot reach the network either.
+RUN CGO_ENABLED=0 go build -mod=vendor -trimpath -ldflags="-s -w" -o /out/lhcnodejs .
 
 # Runtime stage (alpine instead of scratch so CA certificates are available if
 # Redis is ever reached over TLS or the public/ directory is served).

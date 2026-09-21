@@ -55,6 +55,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASS: "${REDIS_PASS:-}"
+      REDIS_USER: "${REDIS_USER:-}"
     ports:
       # Browsers connect here, so it has to be reachable from outside. Only the host
       # port is configurable - keep 8000 inside the container (the Dockerfile

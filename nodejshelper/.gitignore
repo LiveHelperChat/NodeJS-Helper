@@ -2,3 +2,5 @@ node_modules
 serversc/lhc/node_modules
 serversc/lhc/node_modules
 settings/settings.ini.php
+serversc/go-server/.env
+serversc/go-server/vendor

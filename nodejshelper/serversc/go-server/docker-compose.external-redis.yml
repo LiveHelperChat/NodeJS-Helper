@@ -62,6 +62,7 @@ services:
       REDIS_HOST: "${REDIS_HOST:-host.docker.internal}"
       REDIS_PORT: "${REDIS_PORT:-6379}"
       REDIS_PASS: "${REDIS_PASS:-}"
+      REDIS_USER: "${REDIS_USER:-}"
       REDIS_DB: "${REDIS_DB:-0}"
     extra_hosts:
       # Makes host.docker.internal resolve to the Docker host on Linux (Docker >= 20.10).
