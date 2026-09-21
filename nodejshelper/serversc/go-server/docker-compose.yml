@@ -1,0 +1,105 @@
+# Minimal stack for the Go NodeJS Helper server (replaces serversc/lhc), with Redis
+# started as a container as well:
+#
+#   nodejshelper : the websocket server, one binary, no dependencies
+#   redis        : the bus between PHP and the websocket server
+#
+# Already have a Redis (on this host, on another machine, or a managed service)?
+# Use `docker-compose.external-redis.yml` instead - it starts only the server.
+#
+# Usage:
+#   cp .env.example .env      # set SECRET_HASH to your site.secrethash
+#   docker compose up -d --build
+#   docker compose logs -f nodejshelper
+#
+# Live Helper Chat side:
+#   Settings -> NodeJS Helper   : hostname = this host, port = 8000, path = /socketcluster/
+#   extension/nodejshelper/settings/settings.ini.php : 'connect_db' => 'localhost:6379'
+#
+# Putting it behind HTTPS (wss://) - the usual production setup - terminate TLS in
+# nginx/apache and proxy both the upgrade and the /socketcluster/ path to this port.
+
+services:
+  nodejshelper:
+    build: .
+    restart: unless-stopped
+    # One file descriptor per websocket connection - Docker's default soft limit of 1024
+    # is reached quickly. Must not be higher than the Docker daemon's own hard limit.
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    # json-file logs are unbounded by default and would eventually fill the disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    environment:
+      # Has to be identical to `site.secrethash` from lhc_web/settings/settings.ini.php,
+      # otherwise every `login` event fails. The `${VAR:?}` form stops `up` with a clear
+      # message instead of silently refusing to authenticate.
+      # A `$` in the value must be single quoted in .env (see README / .env.example).
+      SECRET_HASH: "${SECRET_HASH:?set SECRET_HASH in .env - it must match site.secrethash}"
+
+      # Optional but recommended: a fixed token signing key, so browser auth tokens
+      # survive a restart. When empty a random key is generated on startup (this is
+      # what SocketCluster did) and every client calls `login` again after a restart.
+      AUTH_KEY: "${AUTH_KEY:-}"
+
+      TRACK_VISITORS: "${TRACK_VISITORS:-true}"
+      ORIGINS: "${ORIGINS:-*:*}"
+      SOCKETCLUSTER_PORT: "8000"
+
+      # Redis service name inside the compose network
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASS: "${REDIS_PASS:-}"
+    ports:
+      # Browsers connect here, so it has to be reachable from outside. Only the host
+      # port is configurable - keep 8000 inside the container (the Dockerfile
+      # healthcheck depends on it).
+      - "${SOCKETCLUSTER_PORT:-8000}:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    # Redis is only the pub/sub bus (and optionally Live Helper Chat's cache), so
+    # persistence is deliberately off. Raise REDIS_MAXMEMORY for busy installs that
+    # also use this instance for the application cache.
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - "${REDIS_MAXMEMORY:-256mb}"
+      - --maxmemory-policy
+      - allkeys-lru
+      # Protected mode blocks connections from the other containers (they are not
+      # loopback), so it is off. The published port is bound to 127.0.0.1 above,
+      # which is what keeps this instance off the network - or set REDIS_PASS and
+      # use `--requirepass` instead.
+      - --protected-mode
+      - "no"
+    ports:
+      # PHP publishes here (erLhcoreClassNodeJSRedis -> lhpredis.php). Bound to
+      # localhost on purpose: Redis has no password and must not be exposed to the
+      # network. Change to "${REDIS_PUBLISH_PORT}:6379" only if PHP runs elsewhere,
+      # and set REDIS_PASS in that case.
+      - "127.0.0.1:${REDIS_PUBLISH_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s

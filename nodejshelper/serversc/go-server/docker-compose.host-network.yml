@@ -1,0 +1,73 @@
+# NodeJS Helper server (Go) on the HOST network - for a Redis that only listens on
+# 127.0.0.1 (the stock Debian/Ubuntu configuration).
+#
+# Why this file exists: a normal container reaches the host through the docker bridge, so
+# it counts as a non-loopback client. A stock Redis (`bind 127.0.0.1`, `protected-mode yes`,
+# no password) refuses it with "DENIED Redis is running in protected mode". With
+# `network_mode: host` the container shares the host's network namespace, so 127.0.0.1 is
+# the real loopback and Redis accepts it - no redis.conf change and no password needed.
+#
+# Caveats:
+#   * Linux only - host networking is unavailable on Docker Desktop for macOS/Windows.
+#   * `ports:` cannot be used (the server binds the host port directly), so
+#     SOCKETCLUSTER_PORT is the real port on the host.
+#   * The container shares the host's network stack, so it has no network isolation.
+#
+# Usage:
+#   cp .env.example .env      # SECRET_HASH (single quoted when it contains $)
+#   docker compose -f docker-compose.host-network.yml up -d --build
+#   docker compose -f docker-compose.host-network.yml logs -f nodejshelper
+#
+# Live Helper Chat side (nothing new to configure):
+#   Settings -> NodeJS Helper : hostname = this host, port = 8000, path = /socketcluster/
+#   extension/nodejshelper/settings/settings.ini.php : 'connect_db' => 'localhost:6379'
+#
+# Putting it behind HTTPS (wss://) - terminate TLS in nginx/apache and proxy the upgrade
+# plus the /socketcluster/ path to this port.
+
+services:
+  nodejshelper:
+    build: .
+    restart: unless-stopped
+    network_mode: host
+    # One file descriptor per websocket connection - Docker's default soft limit of 1024
+    # is reached quickly. Must not be higher than the Docker daemon's own hard limit.
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    # json-file logs are unbounded by default and would eventually fill the disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    environment:
+      # Has to be identical to `site.secrethash` from lhc_web/settings/settings.ini.php,
+      # otherwise every `login` event fails. A `$` in the value must be single quoted
+      # in .env, otherwise compose interpolates it (see README / .env.example).
+      SECRET_HASH: "${SECRET_HASH:?set SECRET_HASH in .env - it must match site.secrethash}"
+
+      # Optional but recommended: a fixed token signing key, so browser auth tokens
+      # survive a restart (random key per start otherwise, exactly like SocketCluster).
+      AUTH_KEY: "${AUTH_KEY:-}"
+
+      TRACK_VISITORS: "${TRACK_VISITORS:-true}"
+      ORIGINS: "${ORIGINS:-*:*}"
+
+      # Real port on the host - there is no port mapping in host network mode.
+      SOCKETCLUSTER_PORT: "${SOCKETCLUSTER_PORT:-8000}"
+
+      # Redis on this host: loopback, which protected mode always allows.
+      REDIS_HOST: "${REDIS_HOST:-127.0.0.1}"
+      REDIS_PORT: "${REDIS_PORT:-6379}"
+      REDIS_PASS: "${REDIS_PASS:-}"
+      REDIS_DB: "${REDIS_DB:-0}"
+    healthcheck:
+      # Overridden because the image healthcheck is hard coded to port 8000, which would
+      # be wrong here when SOCKETCLUSTER_PORT is changed.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:${SOCKETCLUSTER_PORT:-8000}/health-check"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3

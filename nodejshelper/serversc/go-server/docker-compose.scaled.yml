@@ -1,0 +1,127 @@
+# Scaled stack: two NodeJS Helper servers behind nginx, sharing one Redis.
+#
+#   cp .env.example .env
+#   #   SECRET_HASH='<site.secrethash>'      (single quoted if it contains $)
+#   #   AUTH_KEY=<same long random value on EVERY node>   (required here)
+#   docker compose -f docker-compose.scaled.yml up -d --build
+#   docker compose -f docker-compose.scaled.yml logs -f nginx
+#
+# Browsers connect to nginx (`${HTTP_PORT}`, 8080 by default so it can sit next to a
+# single node setup on 8000). The two app containers publish no host ports - that is the
+# point of the proxy. Copy the `nodejshelper-2` block for a third/fourth node.
+#
+# No sticky sessions: every instance shares state through Redis, so any node can serve any
+# browser. See "Running several servers" in README.md for the details and caveats.
+#
+# Redis is bundled so the example runs as is. Using your own instead: delete the `redis`
+# service, set REDIS_HOST/REDIS_PORT (and REDIS_PASS) in the anchor below.
+#
+# For wss:// terminate TLS in nginx (see nginx.conf) - nothing in this stack assumes HTTP.
+
+x-app: &app
+  build: .
+  # Both services share one image instead of building the context twice.
+  image: lhc-nodejshelper:latest
+  restart: unless-stopped
+  # One file descriptor per websocket connection - Docker's default soft limit of 1024
+  # is reached quickly. Must not be higher than the Docker daemon's own hard limit.
+  ulimits:
+    nofile:
+      soft: 65535
+      hard: 65535
+  # json-file logs are unbounded by default and would eventually fill the disk.
+  logging:
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "5"
+
+x-app-env: &app-env
+  SECRET_HASH: "${SECRET_HASH:?set SECRET_HASH in .env - it must match site.secrethash}"
+  # Required for more than one node: a token signed with node A's key is rejected by node B
+  # (the browser then clears it and logs in again, costing a round trip per node switch).
+  AUTH_KEY: "${AUTH_KEY:?set AUTH_KEY in .env - the SAME value on every node}"
+  TRACK_VISITORS: "${TRACK_VISITORS:-true}"
+  ORIGINS: "${ORIGINS:-*:*}"
+  SOCKETCLUSTER_PORT: "8000"
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_PASS: "${REDIS_PASS:-}"
+  REDIS_DB: "${REDIS_DB:-0}"
+  # SC_INSTANCE_ID is intentionally not set: each process generates a unique random id,
+  # which is what makes a node ignore only its own Redis echoes.
+
+services:
+  nodejshelper-1:
+    <<: *app
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+
+  nodejshelper-2:
+    <<: *app
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      # service_started (not service_healthy) so nginx starts even if a backend is sick;
+      # the containers have to exist for nginx to resolve their names at startup.
+      nodejshelper-1:
+        condition: service_started
+      nodejshelper-2:
+        condition: service_started
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    # Redis is only the pub/sub bus (and optionally Live Helper Chat's cache), so
+    # persistence is deliberately off. Raise REDIS_MAXMEMORY for busy installs that
+    # also use this instance for the application cache.
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - "${REDIS_MAXMEMORY:-256mb}"
+      - --maxmemory-policy
+      - allkeys-lru
+      # Protected mode blocks connections from the other containers (they are not
+      # loopback), so it is off. The published port is bound to 127.0.0.1 below, which is
+      # what keeps this instance off the network - or set REDIS_PASS and use
+      # `--requirepass` instead.
+      - --protected-mode
+      - "no"
+    ports:
+      # PHP publishes here (erLhcoreClassNodeJSRedis -> lhpredis.php). Bound to localhost
+      # on purpose: Redis has no password and must not be exposed to the network.
+      - "127.0.0.1:${REDIS_PUBLISH_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s

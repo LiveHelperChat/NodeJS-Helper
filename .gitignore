@@ -1,3 +1,6 @@
 .idea
 nodejshelper/server/settings.js
 nodejshelper/design/nodejshelpertheme/tpl/pagelayouts/parts/nodejshelper_config.tpl.php
+nodejshelper/serversc/go-server/.env
+nodejshelper/serversc/go-server/loadtest/loadtest
+nodejshelper/serversc/lhc/package-lock.json

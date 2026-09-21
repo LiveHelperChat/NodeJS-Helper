@@ -1,0 +1,73 @@
+# NodeJS Helper server (Go) using an EXISTING Redis - no Redis container is started.
+#
+# Use this when Redis already runs on this host, on another machine, or as a managed
+# service (ElastiCache, Upstash, ...):
+#
+#   cp .env.example .env
+#   #   SECRET_HASH=<site.secrethash>
+#   #   REDIS_HOST=host.docker.internal        (or the IP / hostname of that Redis)
+#   #   REDIS_PASS=<password, when required>
+#   docker compose -f docker-compose.external-redis.yml up -d --build
+#
+# The Redis you point at has to accept connections coming from the container network:
+#   * a Redis bound to 127.0.0.1 only (the Debian/Ubuntu default) is NOT reachable from
+#     a container -> set `bind 0.0.0.0` in redis.conf (or the docker bridge IP)
+#   * `protected-mode` (enabled by default) refuses non-loopback clients while no password
+#     is set -> either set `requirepass` (and REDIS_PASS here) or `protected-mode no`
+#   Both mistakes show up in `docker compose logs nodejshelper` as
+#   "redis: DENIED Redis is running in protected mode" / "connection refused", and
+#   /health-check then answers 503.
+#
+# Prefer not to touch redis.conf at all? When Redis listens on 127.0.0.1 on this host,
+# use `docker-compose.host-network.yml` instead (Linux only).
+#
+# Live Helper Chat side:
+#   Settings -> NodeJS Helper : hostname = this host, port = 8000, path = /socketcluster/
+#   extension/nodejshelper/settings/settings.ini.php : 'connect_db' => '<redis host:port>'
+#
+# Putting it behind HTTPS (wss://) - terminate TLS in nginx/apache and proxy both the
+# upgrade and the /socketcluster/ path to this port.
+
+services:
+  nodejshelper:
+    build: .
+    restart: unless-stopped
+    # One file descriptor per websocket connection - Docker's default soft limit of 1024
+    # is reached quickly. Must not be higher than the Docker daemon's own hard limit.
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    # json-file logs are unbounded by default and would eventually fill the disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    environment:
+      # Has to be identical to `site.secrethash` from lhc_web/settings/settings.ini.php,
+      # otherwise every `login` event fails. A `$` in the value must be single quoted
+      # in .env, otherwise compose interpolates it (see README / .env.example).
+      SECRET_HASH: "${SECRET_HASH:?set SECRET_HASH in .env - it must match site.secrethash}"
+
+      # Optional but recommended: a fixed token signing key, so browser auth tokens
+      # survive a restart (random key per start otherwise, exactly like SocketCluster).
+      AUTH_KEY: "${AUTH_KEY:-}"
+
+      TRACK_VISITORS: "${TRACK_VISITORS:-true}"
+      ORIGINS: "${ORIGINS:-*:*}"
+      SOCKETCLUSTER_PORT: "8000"
+
+      # The existing Redis
+      REDIS_HOST: "${REDIS_HOST:-host.docker.internal}"
+      REDIS_PORT: "${REDIS_PORT:-6379}"
+      REDIS_PASS: "${REDIS_PASS:-}"
+      REDIS_DB: "${REDIS_DB:-0}"
+    extra_hosts:
+      # Makes host.docker.internal resolve to the Docker host on Linux (Docker >= 20.10).
+      # Drop this entry when REDIS_HOST points at another machine.
+      - "host.docker.internal:host-gateway"
+    ports:
+      # Browsers connect here. Only the host port is configurable - keep 8000 inside the
+      # container (the Dockerfile healthcheck depends on it).
+      - "${SOCKETCLUSTER_PORT:-8000}:8000"
