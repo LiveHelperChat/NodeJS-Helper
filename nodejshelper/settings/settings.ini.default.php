@@ -1,7 +1,7 @@
 <?php
 
 return array(
-    'connect_db' => 'localhost',
+    'connect_db' => getenv('REDIS_HOST') ?: 'localhost',
     'connect_db_id' => 0,
     'connect_db_pass' => null,
     'automated_hosting' => false,
