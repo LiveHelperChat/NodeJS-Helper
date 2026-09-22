@@ -13,6 +13,10 @@ type Hub struct {
 	mu   sync.RWMutex
 	subs map[string]map[*Socket]struct{}
 
+	// targetsPool recycles the subscriber snapshots PublishLocal takes, so a hot
+	// channel does not allocate an N sized slice on every single publish.
+	targetsPool sync.Pool
+
 	// Hooks used by the Redis bridge to mirror sc-redis' behaviour of
 	// (un)subscribing Redis channels together with the SC channels.
 	onFirstSubscribe  func(channel string)
@@ -71,16 +75,71 @@ func (h *Hub) Remove(s *Socket, channel string) (last bool) {
 }
 
 // PublishLocal delivers a `#publish` event to every local subscriber.
+//
+// The packet is encoded once and the very same byte slice is queued for every
+// subscriber: the bytes are identical for all of them. Previously SendPublish
+// was called per socket, which json.Marshal'ed the payload and then the envelope
+// again for each of them - on a busy channel that dominated the CPU profile
+// (encoding/json ~12%, appendCompact alone 7.5%).
 func (h *Hub) PublishLocal(channel string, data json.RawMessage) {
 	h.mu.RLock()
 	set := h.subs[channel]
-	targets := make([]*Socket, 0, len(set))
+	if len(set) == 0 {
+		h.mu.RUnlock()
+		return
+	}
+
+	targets, _ := h.targetsPool.Get().([]*Socket)
+	targets = targets[:0]
 	for s := range set {
 		targets = append(targets, s)
 	}
 	h.mu.RUnlock()
 
-	for _, s := range targets {
-		s.SendPublish(channel, data)
+	packet := encodePublish(channel, data)
+
+	if packet != nil {
+		for _, s := range targets {
+			// Closed sockets are still in the map until cleanup runs; skipping
+			// them avoids pointless work during a burst of disconnects.
+			if s.closed.Load() {
+				continue
+			}
+			s.enqueueText(packet)
+		}
 	}
+
+	// Do not keep the sockets reachable through the pool.
+	for i := range targets {
+		targets[i] = nil
+	}
+	h.targetsPool.Put(targets[:0])
+}
+
+// outPublishEvent is the `#publish` packet envelope. It exists so that the whole
+// packet can be produced by a single json.Marshal call.
+type outPublishEvent struct {
+	Event string     `json:"event"`
+	Data  outPublish `json:"data"`
+}
+
+// encodePublish builds the wire bytes of one `#publish` packet. The result is
+// shared by every subscriber of the channel and must be treated as read only.
+// It returns nil when the packet cannot be encoded, in which case there is
+// nothing sensible to deliver.
+func encodePublish(channel string, data json.RawMessage) []byte {
+	if data == nil {
+		data = json.RawMessage("null")
+	}
+
+	packet, err := json.Marshal(outPublishEvent{
+		Event: "#publish",
+		Data:  outPublish{Channel: channel, Data: data},
+	})
+	if err != nil {
+		logErrorf("[hub] failed to encode #publish for channel %q: %v", channel, err)
+		return nil
+	}
+
+	return packet
 }

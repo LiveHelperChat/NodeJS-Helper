@@ -14,7 +14,7 @@
 #     a container -> set `bind 0.0.0.0` in redis.conf (or the docker bridge IP)
 #   * `protected-mode` (enabled by default) refuses non-loopback clients while no password
 #     is set -> either set `requirepass` (and REDIS_PASS here) or `protected-mode no`
-#   Both mistakes show up in `docker compose logs nodejshelper` as
+#   Both mistakes show up in `docker compose logs golhchelper` as
 #   "redis: DENIED Redis is running in protected mode" / "connection refused", and
 #   /health-check then answers 503.
 #
@@ -29,7 +29,8 @@
 # upgrade and the /socketcluster/ path to this port.
 
 services:
-  nodejshelper:
+  golhchelper:
+    image: remdex/livehelperchat-golhchelper:latest
     build: .
     restart: unless-stopped
     # One file descriptor per websocket connection - Docker's default soft limit of 1024
@@ -56,6 +57,14 @@ services:
 
       TRACK_VISITORS: "${TRACK_VISITORS:-true}"
       ORIGINS: "${ORIGINS:-*:*}"
+      # See the Security section of .env.example. STRICT_CHANNEL_BINDING is what
+      # stops a visitor token from subscribing to another visitor's chat channel.
+      STRICT_CHANNEL_BINDING: "${STRICT_CHANNEL_BINDING:-true}"
+      RESTRICT_CLIENT_PUBLISH: "${RESTRICT_CLIENT_PUBLISH:-false}"
+      # Outbound queue per websocket (~6 KB each at the default of 256).
+      SOCKET_SEND_BUFFER: "${SOCKET_SEND_BUFFER:-256}"
+      # debug adds a line per websocket connect/disconnect (see .env.example).
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
       SOCKETCLUSTER_PORT: "8000"
 
       # The existing Redis

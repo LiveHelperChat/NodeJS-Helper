@@ -1,0 +1,74 @@
+# LHC NodeJS Helper server (Go) - the SocketCluster replacement for Live Helper Chat.
+#
+# Install (see "Running as a systemd service" in ../README.md for the full walkthrough):
+#
+#   sudo install -m 0644 golhchelper.service \
+#                       golhchelper-healthcheck.service \
+#                       golhchelper-healthcheck.timer /etc/systemd/system/
+#   sudo install -m 0755 golhchelper-healthcheck.sh /usr/local/bin/golhchelper-healthcheck
+#   sudo install -d -m 0755 /usr/local/share/doc/golhchelper
+#   sudo install -m 0644 ../README.md /usr/local/share/doc/golhchelper/README.md
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now golhchelper golhchelper-healthcheck.timer
+#
+# Requirements:
+#   /usr/local/bin/golhchelper             the binary (build: go build -o lhcnodejs .)
+#   /etc/golhchelper/golhchelper.env       configuration, 0640 root:golhchelper
+#   /srv/golhchelper                       WorkingDirectory (the static dir lives here)
+#   user/group `golhchelper`
+
+[Unit]
+Description=Live Helper Chat NodeJS Helper websocket server (Go)
+Documentation=file:/usr/local/share/doc/golhchelper/README.md
+Wants=network-online.target
+# `redis-server.service` is the Debian/Ubuntu unit name - drop it when Redis runs
+# elsewhere (it is only an ordering hint; a Redis that is simply down does not stop the
+# server, the bridge re-subscribes by itself once Redis is back).
+After=network-online.target redis-server.service
+
+[Service]
+Type=simple
+User=golhchelper
+Group=golhchelper
+WorkingDirectory=/srv/golhchelper
+
+# SECRET_HASH (must match `site.secrethash`), AUTH_KEY, REDIS_*, ORIGINS, PING_*.
+# Unlike compose's .env this file does not interpolate `$`, so the secret hash can be
+# pasted as is; use double quotes for values containing `#` or spaces.
+# The file has to exist, otherwise the unit fails to start.
+EnvironmentFile=/etc/golhchelper/golhchelper.env
+
+ExecStart=/usr/local/bin/golhchelper
+
+# One file descriptor per websocket connection - the default soft limit of 1024 runs out
+# after roughly a thousand clients. Keep it within the host's own limit (`fs.file-max`,
+# `DefaultLimitNOFILE` in /etc/systemd/system.conf).
+LimitNOFILE=65535
+
+# The process handles SIGTERM itself: every websocket is closed with code 1001 ("going
+# away") so browsers reconnect at once, and then it exits within milliseconds. SIGKILL is
+# only a backstop - sockets killed instead of closed leave clients waiting for their own
+# ping timeout (20 s by default).
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+Restart=always
+RestartSec=2
+
+# Refuse to start with an unset or placeholder secret hash - every websocket `login` would
+# fail and the reason would only be visible in the log. `$$` is a literal `$` for systemd;
+# the expansion is done by the shell.
+ExecStartPre=/bin/sh -c 'case "$$SECRET_HASH" in ""|change-me*) echo "SECRET_HASH is not set in /etc/golhchelper/golhchelper.env" >&2; exit 1;; esac'
+
+# The server needs its port, Redis and its static directory - nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

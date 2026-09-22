@@ -16,7 +16,7 @@
 # Usage:
 #   cp .env.example .env      # SECRET_HASH (single quoted when it contains $)
 #   docker compose -f docker-compose.host-network.yml up -d --build
-#   docker compose -f docker-compose.host-network.yml logs -f nodejshelper
+#   docker compose -f docker-compose.host-network.yml logs -f golhchelper
 #
 # Live Helper Chat side (nothing new to configure):
 #   Settings -> NodeJS Helper : hostname = this host, port = 8000, path = /socketcluster/
@@ -26,8 +26,9 @@
 # plus the /socketcluster/ path to this port.
 
 services:
-  nodejshelper:
+  golhchelper:
     build: .
+    image: remdex/livehelperchat-golhchelper:latest
     restart: unless-stopped
     network_mode: host
     # One file descriptor per websocket connection - Docker's default soft limit of 1024
@@ -54,6 +55,14 @@ services:
 
       TRACK_VISITORS: "${TRACK_VISITORS:-true}"
       ORIGINS: "${ORIGINS:-*:*}"
+      # See the Security section of .env.example. STRICT_CHANNEL_BINDING is what
+      # stops a visitor token from subscribing to another visitor's chat channel.
+      STRICT_CHANNEL_BINDING: "${STRICT_CHANNEL_BINDING:-true}"
+      RESTRICT_CLIENT_PUBLISH: "${RESTRICT_CLIENT_PUBLISH:-false}"
+      # Outbound queue per websocket (~6 KB each at the default of 256).
+      SOCKET_SEND_BUFFER: "${SOCKET_SEND_BUFFER:-256}"
+      # debug adds a line per websocket connect/disconnect (see .env.example).
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
 
       # Real port on the host - there is no port mapping in host network mode.
       SOCKETCLUSTER_PORT: "${SOCKETCLUSTER_PORT:-8000}"

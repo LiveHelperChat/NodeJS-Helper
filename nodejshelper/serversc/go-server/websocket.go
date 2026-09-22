@@ -44,6 +44,12 @@ type wsConn struct {
 	writeMu sync.Mutex
 	closed  bool
 
+	// Scratch space for writeFrame, guarded by writeMu. The header is assembled
+	// in place and the two slices are handed to net.Buffers as the writev iovec,
+	// so a frame costs no allocation and no copy of the payload.
+	writeHeader [10]byte
+	writeBufs   [2][]byte
+
 	maxPayload int64
 }
 
@@ -200,10 +206,13 @@ func (c *wsConn) ReadMessage() (byte, []byte, error) {
 			if !fragmented {
 				return 0, nil, errWSCorruptFrame
 			}
-			messageBuf = append(messageBuf, payload...)
-			if int64(len(messageBuf)) > c.maxPayload {
+			// Checked before appending: maxPayload is what bounds the memory a
+			// client can pin, and appending first let a fragmented message grow
+			// to twice that.
+			if int64(len(messageBuf))+int64(len(payload)) > c.maxPayload {
 				return 0, nil, errWSMessageTooBig
 			}
+			messageBuf = append(messageBuf, payload...)
 			if fin {
 				return messageOpcode, messageBuf, nil
 			}
@@ -284,6 +293,11 @@ func (c *wsConn) readFrame() (fin bool, opcode byte, payload []byte, err error) 
 	return fin, opcode, payload, nil
 }
 
+// writeFrame writes one unmasked server frame. The header is built on the stack
+// and the payload is passed to the connection untouched: net.Buffers uses writev
+// here (the hijacked connection is a *net.TCPConn), so no copy of the message is
+// made. Building a contiguous frame buffer instead cost one allocation and one
+// full copy of every single outbound message.
 func (c *wsConn) writeFrame(opcode byte, payload []byte) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
@@ -292,24 +306,30 @@ func (c *wsConn) writeFrame(opcode byte, payload []byte) error {
 		return errWSClosed
 	}
 
-	frame := make([]byte, 0, len(payload)+10)
-	frame = append(frame, 0x80|opcode)
+	header := c.writeHeader[:0]
+	header = append(header, 0x80|opcode)
 
 	switch n := len(payload); {
 	case n < 126:
-		frame = append(frame, byte(n))
+		header = append(header, byte(n))
 	case n <= 0xFFFF:
-		frame = append(frame, 126, byte(n>>8), byte(n))
+		header = append(header, 126, byte(n>>8), byte(n))
 	default:
-		frame = append(frame, 127)
+		header = append(header, 127)
 		var ext [8]byte
 		binary.BigEndian.PutUint64(ext[:], uint64(n))
-		frame = append(frame, ext[:]...)
+		header = append(header, ext[:]...)
 	}
 
-	frame = append(frame, payload...)
+	c.writeBufs[0] = header
+	buffers := net.Buffers(c.writeBufs[:1])
 
-	_, err := c.conn.Write(frame)
+	if len(payload) > 0 {
+		c.writeBufs[1] = payload
+		buffers = net.Buffers(c.writeBufs[:2])
+	}
+
+	_, err := buffers.WriteTo(c.conn)
 	return err
 }
 

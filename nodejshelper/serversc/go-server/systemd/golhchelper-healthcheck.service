@@ -1,0 +1,27 @@
+# One health check run for golhchelper.service - started by golhchelper-healthcheck.timer.
+#
+# Install:
+#   sudo install -m 0644 golhchelper-healthcheck.service \
+#                       golhchelper-healthcheck.timer /etc/systemd/system/
+#   sudo install -m 0755 golhchelper-healthcheck.sh /usr/local/bin/golhchelper-healthcheck
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now golhchelper-healthcheck.timer
+
+[Unit]
+Description=Health check for golhchelper.service (/health-check)
+Documentation=file:/usr/local/share/doc/golhchelper/README.md
+After=golhchelper.service
+
+[Service]
+Type=oneshot
+
+# Holds the "consecutive failures" counter between runs. systemd creates the directory and
+# hands it over as $STATE_DIRECTORY, so the check can update it without extra permissions.
+StateDirectory=golhchelper-healthcheck
+
+# Needs privileges only for `systemctl restart golhchelper`; the server itself runs
+# unprivileged. Set SOCKETCLUSTER_PORT here when the server does not listen on 8000.
+#Environment=SOCKETCLUSTER_PORT=8000
+#Environment=FAILS_BEFORE_RESTART=3
+
+ExecStart=/usr/local/bin/golhchelper-healthcheck

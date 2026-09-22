@@ -49,7 +49,7 @@ cp .env.example .env                        # set SECRET_HASH to your site.secre
 
 docker compose up -d --build                # bundled Redis
 docker compose -f docker-compose.external-redis.yml up -d --build   # existing Redis
-docker compose logs -f nodejshelper
+docker compose logs -f golhchelper
 ```
 
 Both start the websocket server; the external file adds nothing but the pointer to your
@@ -71,7 +71,7 @@ on a distro install:
 * `protected-mode` (on by default) refuses non-loopback clients while no password is set -
   either set `requirepass` (and `REDIS_PASS`) or `protected-mode no`.
 
-Both mistakes are visible in `docker compose logs nodejshelper` (`DENIED Redis is running
+Both mistakes are visible in `docker compose logs golhchelper` (`DENIED Redis is running
 in protected mode` / connection refused) and make `/health-check` answer `503`.
 
 Then point Live Helper Chat at it:
@@ -105,9 +105,134 @@ Notes:
 Without compose:
 
 ```bash
-docker build -t lhc-nodejshelper .
-docker run -p 8000:8000 -e SECRET_HASH=... -e REDIS_HOST=redis lhc-nodejshelper
+docker build -t lhc-golhchelper .
+docker run -p 8000:8000 -e SECRET_HASH=... -e REDIS_HOST=redis lhc-golhchelper
 ```
+
+## Running as a systemd service
+
+The server is a single static binary, so no container runtime is needed - it also runs
+directly on the host, supervised by systemd. The ready made units live in `systemd/`:
+
+| File | Install as | Purpose |
+| --- | --- | --- |
+| `systemd/golhchelper.service` | `/etc/systemd/system/golhchelper.service` | the server |
+| `systemd/golhchelper.env.example` | `/etc/golhchelper/golhchelper.env` | configuration (`SECRET_HASH`, Redis, ...) |
+| `systemd/golhchelper-healthcheck.sh` | `/usr/local/bin/golhchelper-healthcheck` | polls `/health-check` |
+| `systemd/golhchelper-healthcheck.service` + `.timer` | `/etc/systemd/system/` | restarts the server when the check keeps failing |
+
+### Install
+
+```bash
+cd extension/nodejshelper/serversc/go-server
+
+# 1. Dedicated unprivileged user - the server needs no root rights
+sudo useradd --system --home /srv/golhchelper --shell /usr/sbin/nologin golhchelper
+
+# 2. Binary (installed under the service name; the build output is called lhcnodejs,
+#    the same name the Dockerfile produces) and the optional static directory
+go build -mod=vendor -trimpath -ldflags="-s -w" -o lhcnodejs .
+sudo install -m 0755 lhcnodejs /usr/local/bin/golhchelper
+sudo install -d -m 0755 -o golhchelper -g golhchelper /srv/golhchelper/public
+
+# 3. Configuration - 0640 root:golhchelper, it holds the secret hash
+sudo install -d -m 0750 /etc/golhchelper
+sudo install -m 0640 -o root -g golhchelper systemd/golhchelper.env.example /etc/golhchelper/golhchelper.env
+sudoedit /etc/golhchelper/golhchelper.env        # SECRET_HASH, AUTH_KEY, REDIS_*
+
+# 4. Units (+ the README the units point at in Documentation=)
+sudo install -m 0644 systemd/golhchelper.service \
+                    systemd/golhchelper-healthcheck.service \
+                    systemd/golhchelper-healthcheck.timer /etc/systemd/system/
+sudo install -m 0755 systemd/golhchelper-healthcheck.sh /usr/local/bin/golhchelper-healthcheck
+sudo install -d -m 0755 /usr/local/share/doc/golhchelper
+sudo install -m 0644 README.md /usr/local/share/doc/golhchelper/README.md
+sudo systemctl daemon-reload
+
+# 5. Start and verify
+sudo systemctl enable --now golhchelper
+sudo systemctl enable --now golhchelper-healthcheck.timer
+systemctl --no-pager status golhchelper
+curl -fsS http://127.0.0.1:8000/health-check && echo
+```
+
+Then configure Live Helper Chat exactly as for the container
+(`Settings -> NodeJS Helper`: this host, port `8000`, path `/socketcluster/`).
+
+### Configuration
+
+`/etc/golhchelper/golhchelper.env` is a systemd `EnvironmentFile`: one `KEY=value` per
+line, no `export`. The variables are the ones from the table above - `SECRET_HASH` and
+`AUTH_KEY` are the two that matter, plus `REDIS_*` when Redis does not run on
+`127.0.0.1:6379`.
+
+* `SECRET_HASH` must equal `site.secrethash`, otherwise every websocket `login` fails. The
+  unit refuses to start while it is unset or still the `change-me-...` placeholder, so that
+  mistake shows up as a failed `systemctl start` instead of a log line.
+* **Unlike compose's `.env`, `EnvironmentFile` does not interpolate `$`** - the hash can be
+  pasted as is. Wrap the value in double quotes when it contains `#` or a space:
+  `SECRET_HASH="...$#)8$asf931a171"`.
+* `AUTH_KEY` should be set to a fixed, long random value, otherwise browser tokens stop
+  working after every restart. It has to be identical on every node - see
+  *Running several servers*.
+* A Redis on the same host needs no `redis.conf` change: PHP, the server and Redis all talk
+  over loopback, so `protected-mode` accepts them (the `docker-compose.host-network.yml`
+  workaround exists only to put a container back onto that loopback).
+* `LimitNOFILE=65535` in the unit is what allows tens of thousands of clients; check it with
+  `systemctl show -p LimitNOFILE --value golhchelper`. The host limit still applies
+  (`sysctl fs.file-max`, `DefaultLimitNOFILE` in `/etc/systemd/system.conf`).
+* The service is reachable on the host only - open `SOCKETCLUSTER_PORT` (`8000`) in the
+  firewall, or better, let only nginx through to it.
+* For `wss://` terminate TLS in nginx/apache and proxy `/socketcluster/` including the
+  websocket upgrade to `127.0.0.1:8000`. The `nginx.conf` in this directory does the same
+  for the compose stack - replace its `upstream` block with
+  `upstream golhchelper { server 127.0.0.1:8000; }` and drop the containers.
+
+### Health check
+
+`/health-check` is the endpoint to watch: `200 OK` while the Redis bridge is up, `503
+Failed` when Redis is unreachable (open sockets keep working, cross node delivery does not).
+
+```bash
+curl -fsS http://127.0.0.1:8000/health-check && echo      # OK, or Failed + HTTP 503
+```
+
+Point an existing monitor (Nagios, Zabbix, Uptime Kuma, ...) at that URL and use
+`systemctl restart golhchelper` as the recovery action. Without such a monitor the bundled
+watchdog does exactly that:
+
+* `golhchelper-healthcheck.timer` fires 60 s after boot and then every 30 s;
+* one `curl` with a 5 s timeout per run, the outcome is logged to the journal;
+* the server is restarted only after **3 consecutive** failures, so a single blip or a short
+  Redis outage does not drop every websocket;
+* that restart is graceful: SIGTERM makes the server close every socket with code `1001`
+  and exit within milliseconds, so browsers reconnect at once.
+
+```bash
+systemctl list-timers golhchelper-healthcheck.timer
+journalctl -u golhchelper-healthcheck -n 20        # failures and restarts
+journalctl -u golhchelper-healthcheck -f
+```
+
+The watchdog runs as root (only `systemctl restart` needs it), the server itself does not.
+
+### Operating it
+
+```bash
+systemctl restart golhchelper           # graceful, clients are closed with 1001
+journalctl -u golhchelper -f            # logs; journald rotates them, tune with
+                                        # SystemMaxUse in /etc/systemd/journald.conf
+systemctl show -p MainPID --value golhchelper                     # pid
+ss -Htn state established '( sport = :8000 )' | wc -l             # websocket clients
+ls /proc/$(systemctl show -p MainPID --value golhchelper)/fd | wc -l   # open fds
+```
+
+Open file descriptors are roughly `clients + 8`; when that approaches `LimitNOFILE`
+(65535), raise the limit or add a second node - a copy of the unit under a second name with
+its own `SOCKETCLUSTER_PORT`, pointed at the same Redis (see *Running several servers*; in
+nginx that is one more `server 127.0.0.1:<port>` line in the upstream block). Give the extra
+node its own copy of the health check units with `Environment=SOCKETCLUSTER_PORT=<port>`,
+otherwise the watchdog keeps checking 8000 and restarts the wrong instance.
 
 ## Running several servers
 
@@ -158,9 +283,13 @@ Caveats worth knowing:
 Everywhere below `<container>` is the server container. Find it with
 
 ```bash
-docker compose ps                                  # service is called nodejshelper
-docker ps --filter name=nodejshelper --format '{{.Names}}'
+docker compose ps                                  # service is called golhchelper
+docker ps --filter name=golhchelper --format '{{.Names}}'
 ```
+
+Running it as a systemd service instead of a container? The same numbers are shown in
+*Running as a systemd service -> Operating it* (`journalctl -u golhchelper`,
+`systemctl show -p MainPID --value golhchelper`).
 
 ### Is it up?
 
@@ -263,8 +392,8 @@ while true; do
 done
 ```
 
-`watch -n1 docker stats` gives CPU and memory instead (about 19 KB per connection plus a
-~10 MB base, measured at 941 MB for 50 000 connections).
+`watch -n1 docker stats` gives CPU and memory instead (about 28 KB per connection plus a
+~10 MB base, measured at 1.4 GB for 50 000 connections).
 
 ### Several nodes
 
@@ -273,12 +402,12 @@ Each instance holds its own sockets, so sum the replicas - but note the socket c
 
 ```bash
 # one line per node, then the total
-for c in $(docker ps --filter name=nodejshelper --format '{{.Names}}'); do
+for c in $(docker ps --filter name=golhchelper --format '{{.Names}}'); do
   printf '%s %s\n' "$c" "$(docker exec "$c" sh -c 'ls /proc/1/fd | wc -l')"
 done | awk '{print; s+=$NF} END {print "total open fds:", s}'
 ```
 
-With `docker-compose.scaled.yml` that is `nodejshelper-1` and `nodejshelper-2`; the
+With `docker-compose.scaled.yml` that is `golhchelper-1` and `golhchelper-2`; the
 `nginx` and `redis` containers are not matched by the name filter.
 
 ### What to watch
@@ -287,7 +416,7 @@ With `docker-compose.scaled.yml` that is `nodejshelper-1` and `nodejshelper-2`; 
 | --- | --- | --- |
 | open fds | `ls /proc/<pid>/fd \| wc -l` | the limit is 65535 from `ulimits` in the compose files; one per client plus ~10 |
 | websocket clients | `ss -Htn state established '( sport = :8000 )' \| wc -l` | correlate with the operators/visitors PHP thinks are online |
-| memory | `docker stats` | ~19 KB per connection |
+| memory | `docker stats` | ~28 KB per connection |
 | CPU | `docker stats` | idle cost is mostly keep alive pings - see Load testing below |
 | bridge state | `curl -f http://127.0.0.1:8000/health-check` | `503` means Redis is unreachable: sockets keep working, cross-node delivery does not |
 
@@ -360,7 +489,7 @@ SECRET_HASH='e9ekdkld4d0_D934-+_4535d_D9jasd@ASGFjkSDFfjksdffksdF456$#)8$asf931a
 
 The symptom is a compose warning (`The "asf931a171" variable is not set`) followed by
 every websocket `login` failing. Confirm what the container really got with
-`docker compose exec nodejshelper printenv SECRET_HASH`. The same applies to `AUTH_KEY`.
+`docker compose exec golhchelper printenv SECRET_HASH`. The same applies to `AUTH_KEY`.
 
 ## Configuration
 
@@ -379,10 +508,20 @@ Everything that was spread between `server.js` (SocketCluster options +
 | `options.handshakeTimeout` | `HANDSHAKE_TIMEOUT_MS` | `10000` |
 | `options.origins` | `ORIGINS` | `*:*` |
 | `allowClientPublish` | `ALLOW_CLIENT_PUBLISH` | `true` |
+| - | `RESTRICT_CLIENT_PUBLISH` | `false` |
+| - | `STRICT_CHANNEL_BINDING` | `true` |
+| - | `SOCKET_SEND_BUFFER` | `256` |
 | `brokerOptions.host/port/auth_pass` | `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASS` / `REDIS_DB` | `127.0.0.1` / `6379` / - / `0` |
 | `options.instanceId` (left unset) | `SC_INSTANCE_ID` | random per process |
 | `serveStatic(path.resolve(__dirname, 'public'))` | `STATIC_DIR` | `public` |
 | - | `MAX_PAYLOAD` | `4194304` (4 MiB) |
+| `logLevel` (SocketCluster was always chatty) | `LOG_LEVEL` | `info` |
+
+`LOG_LEVEL` is `debug`, `info`, `warn` or `error`. Each websocket connect/disconnect is
+logged at `debug`, so the default output only contains what changed: the listening banner,
+Redis (dis)connects, upgrade rejections and errors. Raise it to `debug` when a client
+connects in a loop - the pair of lines with the socket id is then there again (the server
+prints the level it picked as the first line, `LOG_LEVEL=warn` for a quiet journal).
 
 `SOCKETCLUSTER_WORKERS`, `SOCKETCLUSTER_BROKERS` and the related clustering
 variables are ignored - see *Scaling* below.
@@ -402,10 +541,13 @@ working after a restart and every client transparently calls `login` again.
   `SHA1(ts + 'Operator' + secretHash) . ts`, both valid for one hour.
   On success it stores `{token, exp, chanelName, instance_id, isChatToken, isVisitor}`
   (visitors 120 min, operators 12 h) and emits `#setAuthToken`.
-* `MIDDLEWARE_SUBSCRIBE` - anonymous sockets are rejected, visitors may only use a
-  `chat_*` channel when their token was issued for a chat (`isChatToken`), and
-  visitor presence (`{op:'vi_online'}`) is published to `chat_*` / `ous_<instance>`.
+* `MIDDLEWARE_SUBSCRIBE` - anonymous sockets are rejected, a visitor may only use
+  the `chat_*` channel its token was issued for (`isChatToken` plus
+  `STRICT_CHANNEL_BINDING`), and visitor presence (`{op:'vi_online'}`) is
+  published to `chat_*` / `ous_<instance>` once the subscription is accepted.
 * `#publish` - auto acked (`{rid}`) and fanned out locally plus to Redis.
+  `RESTRICT_CLIENT_PUBLISH=true` additionally refuses channels the socket does
+  not hold.
 * `disconnect` - publishes `vi_online:false` to the chat channel or
   `ous_<instance>`.
 * Ping/pong - the server sends `#1` every `PING_INTERVAL_MS`, clients answer `#2`,
@@ -450,6 +592,26 @@ Three changes are deliberate, everything else is a 1:1 port:
    and `<instanceId>/o:{...}` (another node) are still accepted.
 3. **Message size is capped** at `MAX_PAYLOAD` (SocketCluster's default was
    unlimited) so one connection cannot exhaust memory.
+4. **A visitor token is bound to its chat channel.** worker.js accepted any
+   `chat_*` channel as long as the token carried `isChatToken`, so a visitor
+   could subscribe to - and with `allowClientPublish`, publish into - any other
+   visitor's chat; chat ids are sequential, so that was a practical way to read
+   them. `tokenvisitor.php` already signs the chat id into the hash and the
+   widget logs in with the very same channel it subscribes to, so
+   `STRICT_CHANNEL_BINDING` (default `true`) simply enforces what the comment in
+   `worker.js` claimed. Set it to `false` for the old behaviour.
+
+## Tests
+
+```bash
+go test ./...        # add -race for the detector
+```
+
+They run without Redis and without a network: websocket framing (all three
+payload length encodings), the sc-redis wire format and the self-message skip,
+token signing/verification, the `login` hash (visitor, chat, instance prefixed
+and operator), origin checks, the hub subscribe/unsubscribe hooks, the fan out
+encoding, the configuration defaults and the log rate limiter.
 
 ## Load testing
 
@@ -516,7 +678,7 @@ and CPU figures include that contention.
 | scenario | result |
 | --- | --- |
 | 50000 connections, one channel each | 50000/50000 opened, 0 failed, 0 unexpected closes, 4838 conn/s, handshake p50 0.07 ms, login p50 0.06 ms, subscribe p50 0.12 ms |
-| server during that run | 50011 open fds, 941 MB RSS (~19 KB per connection), 25 threads |
+| server during that run | 50016 open fds, 1.42 GB peak RSS (~28 KB per connection), 14 threads |
 | server idle, no connections | 0.00% of a core |
 | 20000 connections idle, default 8 s ping | 48% of one core |
 | 20000 connections idle, `PING_INTERVAL_MS=16000` | 11.5% of one core |
@@ -525,7 +687,7 @@ and CPU figures include that contention.
 
 Conclusions worth keeping in mind:
 
-* Connection count itself is cheap - tens of thousands per instance, about 19 KB
+* Connection count itself is cheap - tens of thousands per instance, about 28 KB
   of memory each, no threads per connection.
 * Idle CPU is dominated by the keep alive ping. SocketCluster's 8 s default is
   conservative; 15 s (still below the 20 s `pingTimeout` the browser client uses)

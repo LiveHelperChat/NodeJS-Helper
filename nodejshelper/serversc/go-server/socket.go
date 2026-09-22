@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -82,7 +81,7 @@ func newSocket(srv *Server, ws *wsConn) *Socket {
 		id:       newSocketID(),
 		ws:       ws,
 		srv:      srv,
-		outbound: make(chan []byte, 256),
+		outbound: make(chan []byte, srv.cfg.SendBuffer),
 		done:     make(chan struct{}),
 		subs:     make(map[string]struct{}),
 	}
@@ -137,10 +136,17 @@ func (s *Socket) pingLoop() {
 	ticker := time.NewTicker(s.srv.cfg.PingInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		if s.closed.Load() {
+	for {
+		select {
+		case <-s.done:
+			// The socket is gone. Returning here instead of waiting for the next
+			// tick keeps a goroutine (and the whole Socket, through the closure)
+			// alive for up to PingInterval after every disconnect - at high churn
+			// that piled up thousands of goroutines.
 			return
+		case <-ticker.C:
 		}
+
 		if time.Since(time.Unix(0, s.lastActive.Load())) > s.srv.cfg.PingTimeout {
 			s.closeWith(4000, "Pong timeout")
 			return
@@ -174,7 +180,7 @@ func (s *Socket) handleMessage(payload []byte) {
 	if trimmed[0] == '[' {
 		var batch []inEvent
 		if err := json.Unmarshal(trimmed, &batch); err != nil {
-			log.Printf("[socket %s] invalid batch message: %v", s.id, err)
+			logWarnf("[socket %s] invalid batch message: %v", s.id, err)
 			return
 		}
 		for i := range batch {
@@ -185,7 +191,7 @@ func (s *Socket) handleMessage(payload []byte) {
 
 	var event inEvent
 	if err := json.Unmarshal(trimmed, &event); err != nil {
-		log.Printf("[socket %s] invalid message: %v", s.id, err)
+		logWarnf("[socket %s] invalid message: %v", s.id, err)
 		return
 	}
 	s.handleEvent(&event)
@@ -335,7 +341,7 @@ func (s *Socket) handleLogin(ev *inEvent) {
 
 	signedToken, err := signToken(s.srv.cfg.AuthKey, token)
 	if err != nil {
-		log.Printf("[socket %s] failed to sign auth token: %v", s.id, err)
+		logErrorf("[socket %s] failed to sign auth token: %v", s.id, err)
 		return
 	}
 
@@ -407,20 +413,25 @@ func (s *Socket) handleSubscribe(ev *inEvent) {
 		return
 	}
 
-	if strings.Contains(channel, "chat_") && token.IsVisitor {
+	isChatChannel := strings.Contains(channel, "chat_") && token.IsVisitor
+
+	if isChatChannel {
 		if !token.IsChatToken {
 			s.subscribeFailed(ev, channel)
 			return
 		}
-		// The socket may only subscribe to the channel its token was issued for.
-		s.mu.Lock()
-		token.ChanelNameChat = channel
-		s.mu.Unlock()
 
-		s.publishPresence(channel, true, "")
-	} else if token.IsVisitor && s.srv.cfg.TrackVisitors {
-		// Online visitor tracking: inform the `ous_<instance>` channel.
-		s.publishPresence("ous_"+strconv.Itoa(token.InstanceID), true, lastTokenPart(token.ChanelName))
+		// A visitor token belongs to exactly one chat: tokenvisitor.php folds the
+		// chat id into the hash it signs, and the widget logs in with the very same
+		// channel string it then subscribes to. Anything else is a visitor asking
+		// for somebody else's conversation, and since chat ids are sequential that
+		// is a practical way to read other visitors' chats.
+		if s.srv.cfg.StrictChannelBinding && channel != token.ChanelName {
+			logRateLimitedf("channel-binding",
+				"[socket %s] refused subscribe to %s: token was issued for %s", s.id, channel, token.ChanelName)
+			s.subscribeFailed(ev, channel)
+			return
+		}
 	}
 
 	s.mu.Lock()
@@ -437,6 +448,20 @@ func (s *Socket) handleSubscribe(ev *inEvent) {
 				fmt.Sprintf("Socket %s tried to exceed the channel subscription limit of %d", s.id, s.srv.cfg.ChannelLimit))
 		}
 		return
+	}
+
+	// Presence is announced only now that the subscription is really accepted.
+	// Publishing it before the channel limit check announced a visitor that never
+	// got subscribed - and therefore never published the matching vi_online:false.
+	if isChatChannel {
+		s.mu.Lock()
+		token.ChanelNameChat = channel
+		s.mu.Unlock()
+
+		s.publishPresence(channel, true, "")
+	} else if token.IsVisitor && s.srv.cfg.TrackVisitors {
+		// Online visitor tracking: inform the `ous_<instance>` channel.
+		s.publishPresence("ous_"+strconv.Itoa(token.InstanceID), true, lastTokenPart(token.ChanelName))
 	}
 
 	s.srv.hub.Add(s, channel)
@@ -497,15 +522,17 @@ func (s *Socket) handlePublish(ev *inEvent) {
 		return
 	}
 
-	s.srv.publish(request.Channel, request.Data)
-}
-
-// SendPublish delivers a `#publish` packet to this socket.
-func (s *Socket) SendPublish(channel string, data json.RawMessage) {
-	if data == nil {
-		data = json.RawMessage("null")
+	// SocketCluster's allowClientPublish let a client publish anywhere, and the
+	// widget uses that for typing notifications. RESTRICT_CLIENT_PUBLISH narrows
+	// it to the channels the socket actually holds, which stops one connection
+	// from injecting into other visitors' chat channels.
+	if s.srv.cfg.RestrictClientPublish && !s.isSubscribed(request.Channel) {
+		logRateLimitedf("publish-restricted",
+			"[socket %s] dropped #publish to %s: socket is not subscribed to it", s.id, request.Channel)
+		return
 	}
-	s.sendEvent("#publish", outPublish{Channel: channel, Data: data})
+
+	s.srv.publish(request.Channel, request.Data)
 }
 
 func (s *Socket) publishPresence(channel string, status bool, vid string) {
@@ -547,6 +574,9 @@ func (s *Socket) cleanup() {
 	s.stopOnce.Do(func() { close(s.done) })
 	s.closed.Store(true)
 	_ = s.ws.Close()
+
+	// Pairs with the "connected from" line, both are debug only.
+	logDebugf("[socket %s] disconnected", s.id)
 }
 
 // closeWith closes the connection from the server side. Protocol level decisions (ping
@@ -555,7 +585,7 @@ func (s *Socket) cleanup() {
 func (s *Socket) closeWith(code uint16, reason string) {
 	if s.closed.CompareAndSwap(false, true) {
 		if code >= 4000 {
-			log.Printf("[socket %s] closed by server: code=%d %s", s.id, code, reason)
+			logInfof("[socket %s] closed by server: code=%d %s", s.id, code, reason)
 		}
 		_ = s.ws.WriteClose(code, reason)
 	}
@@ -568,7 +598,7 @@ func (s *Socket) reportReadError(err error) {
 	if err == nil || err == errWSClosed || isExpectedDisconnect(err) {
 		return
 	}
-	log.Printf("[socket %s] read error: %v", s.id, err)
+	logWarnf("[socket %s] read error: %v", s.id, err)
 }
 
 func isExpectedDisconnect(err error) bool {
@@ -654,6 +684,14 @@ func (s *Socket) authToken() *authToken {
 	return s.token
 }
 
+// isSubscribed reports whether the socket currently holds the channel.
+func (s *Socket) isSubscribed(channel string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.subs[channel]
+	return ok
+}
+
 func (s *Socket) isAuthenticated() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -666,7 +704,7 @@ func (s *Socket) sendJSON(value any) {
 	}
 	payload, err := json.Marshal(value)
 	if err != nil {
-		log.Printf("[socket %s] failed to encode message: %v", s.id, err)
+		logErrorf("[socket %s] failed to encode message: %v", s.id, err)
 		return
 	}
 	s.enqueueText(payload)
@@ -682,13 +720,9 @@ func (s *Socket) enqueueText(payload []byte) {
 		return
 	case s.outbound <- payload:
 	default:
-		log.Printf("[socket %s] closed slow consumer", s.id)
+		logRateLimitedf("slow-consumer", "[socket %s] closed slow consumer (outbound queue full)", s.id)
 		s.closeWith(1008, "Outbound queue full")
 	}
-}
-
-func (s *Socket) sendEvent(event string, data any) {
-	s.sendEventWithCid(event, data, nil)
 }
 
 func (s *Socket) sendEventWithCid(event string, data any, cid *int64) {
@@ -696,7 +730,7 @@ func (s *Socket) sendEventWithCid(event string, data any, cid *int64) {
 	if data != nil {
 		encoded, err := json.Marshal(data)
 		if err != nil {
-			log.Printf("[socket %s] failed to encode %s payload: %v", s.id, event, err)
+			logErrorf("[socket %s] failed to encode %s payload: %v", s.id, event, err)
 			return
 		}
 		out.Data = encoded
@@ -718,7 +752,7 @@ func (s *Socket) respond(cid int64, data any) {
 	if data != nil {
 		encoded, err := json.Marshal(data)
 		if err != nil {
-			log.Printf("[socket %s] failed to encode response: %v", s.id, err)
+			logErrorf("[socket %s] failed to encode response: %v", s.id, err)
 			return
 		}
 		out.Data = encoded

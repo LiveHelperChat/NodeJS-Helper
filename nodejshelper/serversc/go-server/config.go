@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -14,7 +13,7 @@ import (
 // defaultSecretHash is the value that was hard coded in serversc/lhc/server.js
 // (`secretHash`). It has to match `site.secrethash` from the Live Helper Chat
 // settings, otherwise the `login` event will never authenticate a client.
-const defaultSecretHash = "e9ekdkld4d0_D934-+_4535d_D9jasd@ASGFjkSDFfjksdffksdF456$#)8$asf931a171"
+const defaultSecretHash = "dummy_hash"
 
 // Config holds everything that used to be spread between
 // serversc/lhc/server.js (SocketCluster options + brokerOptions) and worker.js
@@ -31,12 +30,17 @@ type Config struct {
 	// Behaviour
 	TrackVisitors      bool          // TRACK_VISITORS (server.js `trackVisitors`)
 	ChannelLimit       int           // SOCKET_CHANNEL_LIMIT (default 1000)
+	SendBuffer         int           // SOCKET_SEND_BUFFER (default 256)
 	PingInterval       time.Duration // PING_INTERVAL_MS (SocketCluster default 8000ms)
 	PingTimeout        time.Duration // PING_TIMEOUT_MS (SocketCluster default 20000ms)
 	HandshakeTimeout   time.Duration // HANDSHAKE_TIMEOUT_MS (default 10000ms)
 	MaxPayload         int64         // MAX_PAYLOAD (bytes, default 4MiB)
 	AllowedOrigins     string        // ORIGINS (default *:*)
 	AllowClientPublish bool          // ALLOW_CLIENT_PUBLISH (default true)
+
+	// Security
+	StrictChannelBinding  bool // STRICT_CHANNEL_BINDING (default true)
+	RestrictClientPublish bool // RESTRICT_CLIENT_PUBLISH (default false)
 
 	// Redis (server.js `brokerOptions` + sc-redis)
 	RedisHost  string // REDIS_HOST
@@ -61,7 +65,7 @@ func envInt(key string, def int) int {
 	if v, ok := os.LookupEnv(key); ok && v != "" {
 		n, err := strconv.Atoi(strings.TrimSpace(v))
 		if err != nil {
-			log.Printf("[config] %s=%q is not a number, keeping %d", key, v, def)
+			logWarnf("[config] %s=%q is not a number, keeping %d", key, v, def)
 			return def
 		}
 		return n
@@ -77,7 +81,7 @@ func envBool(key string, def bool) bool {
 		case "0", "false", "no", "off":
 			return false
 		}
-		log.Printf("[config] %s=%q is not a boolean, keeping %v", key, v, def)
+		logWarnf("[config] %s=%q is not a boolean, keeping %v", key, v, def)
 	}
 	return def
 }
@@ -128,19 +132,23 @@ func loadConfig() *Config {
 		SecretHash:         envStr("SECRET_HASH", envStr("SOCKETCLUSTER_SECRET_HASH", defaultSecretHash)),
 		TrackVisitors:      envBool("TRACK_VISITORS", true),
 		ChannelLimit:       envInt("SOCKET_CHANNEL_LIMIT", 1000),
+		SendBuffer:         envInt("SOCKET_SEND_BUFFER", 256),
 		PingInterval:       envDuration("PING_INTERVAL_MS", 8*time.Second),
 		PingTimeout:        envDuration("PING_TIMEOUT_MS", 20*time.Second),
 		HandshakeTimeout:   envDuration("HANDSHAKE_TIMEOUT_MS", 10*time.Second),
 		MaxPayload:         int64(envInt("MAX_PAYLOAD", 4*1024*1024)),
 		AllowedOrigins:     envStr("ORIGINS", "*:*"),
 		AllowClientPublish: envBool("ALLOW_CLIENT_PUBLISH", true),
-		RedisHost:          envStr("REDIS_HOST", "127.0.0.1"),
-		RedisPort:          envInt("REDIS_PORT", 6379),
-		RedisUser:          envStr("REDIS_USER", ""),
-		RedisPass:          envStr("REDIS_PASS", ""),
-		RedisDB:            envInt("REDIS_DB", 0),
-		InstanceID:         defaultInstanceID(),
-		StaticDir:          envStr("STATIC_DIR", "public"),
+
+		StrictChannelBinding:  envBool("STRICT_CHANNEL_BINDING", true),
+		RestrictClientPublish: envBool("RESTRICT_CLIENT_PUBLISH", false),
+		RedisHost:             envStr("REDIS_HOST", "127.0.0.1"),
+		RedisPort:             envInt("REDIS_PORT", 6379),
+		RedisUser:             envStr("REDIS_USER", ""),
+		RedisPass:             envStr("REDIS_PASS", ""),
+		RedisDB:               envInt("REDIS_DB", 0),
+		InstanceID:            defaultInstanceID(),
+		StaticDir:             envStr("STATIC_DIR", "public"),
 	}
 
 	// SocketCluster generated a random 32 byte key on every start when authKey was
@@ -150,7 +158,7 @@ func loadConfig() *Config {
 		cfg.AuthKey = []byte(key)
 	} else {
 		cfg.AuthKey = randomHexKey()
-		log.Printf("[config] AUTH_KEY not set - using a random token signing key, clients will re-login after restart")
+		logInfof("[config] AUTH_KEY not set - using a random token signing key, clients will re-login after restart")
 	}
 
 	// Make sure the WS path has both a leading and a trailing slash, exactly like
@@ -164,6 +172,11 @@ func loadConfig() *Config {
 
 	if cfg.MaxPayload < 1024 {
 		cfg.MaxPayload = 1024
+	}
+
+	// A zero length queue would disconnect every socket on its first message.
+	if cfg.SendBuffer < 1 {
+		cfg.SendBuffer = 1
 	}
 
 	return cfg

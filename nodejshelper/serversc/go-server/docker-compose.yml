@@ -1,7 +1,7 @@
 # Minimal stack for the Go NodeJS Helper server (replaces serversc/lhc), with Redis
 # started as a container as well:
 #
-#   nodejshelper : the websocket server, one binary, no dependencies
+#   golhchelper  : the websocket server, one binary, no dependencies
 #   redis        : the bus between PHP and the websocket server
 #
 # Already have a Redis (on this host, on another machine, or a managed service)?
@@ -10,7 +10,7 @@
 # Usage:
 #   cp .env.example .env      # set SECRET_HASH to your site.secrethash
 #   docker compose up -d --build
-#   docker compose logs -f nodejshelper
+#   docker compose logs -f golhchelper
 #
 # Live Helper Chat side:
 #   Settings -> NodeJS Helper   : hostname = this host, port = 8000, path = /socketcluster/
@@ -20,8 +20,9 @@
 # nginx/apache and proxy both the upgrade and the /socketcluster/ path to this port.
 
 services:
-  nodejshelper:
+  golhchelper:
     build: .
+    image: remdex/livehelperchat-golhchelper:latest
     restart: unless-stopped
     # One file descriptor per websocket connection - Docker's default soft limit of 1024
     # is reached quickly. Must not be higher than the Docker daemon's own hard limit.
@@ -49,6 +50,14 @@ services:
 
       TRACK_VISITORS: "${TRACK_VISITORS:-true}"
       ORIGINS: "${ORIGINS:-*:*}"
+      # See the Security section of .env.example. STRICT_CHANNEL_BINDING is what
+      # stops a visitor token from subscribing to another visitor's chat channel.
+      STRICT_CHANNEL_BINDING: "${STRICT_CHANNEL_BINDING:-true}"
+      RESTRICT_CLIENT_PUBLISH: "${RESTRICT_CLIENT_PUBLISH:-false}"
+      # Outbound queue per websocket (~6 KB each at the default of 256).
+      SOCKET_SEND_BUFFER: "${SOCKET_SEND_BUFFER:-256}"
+      # debug adds a line per websocket connect/disconnect (see .env.example).
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
       SOCKETCLUSTER_PORT: "8000"
 
       # Redis service name inside the compose network

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"log"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -34,6 +34,28 @@ const (
 	// redisProbeTimeout bounds that PING.
 	redisProbeTimeout = 5 * time.Second
 )
+
+// redisLogger forwards go-redis' internal logger (pool failures, dial errors)
+// into the application log. Without it those lines bypass LOG_LEVEL and arrive
+// as a bare `redis: ...` line in a different format, e.g.
+//
+//	redis: 2026/09/22 06:10:59 pool.go:762: redis: connection pool: failed to dial ...
+type redisLogger struct{}
+
+func (redisLogger) Printf(_ context.Context, format string, v ...any) {
+	if levelWarn < currentLogLevel {
+		return
+	}
+
+	// go-redis prefixes its own messages with "redis: ", which the "[redis]"
+	// tag below already says.
+	message := strings.TrimPrefix(strings.TrimSpace(fmt.Sprintf(format, v...)), "redis: ")
+	logWarnLine("[redis] " + message)
+}
+
+func init() {
+	redis.SetLogger(redisLogger{})
+}
 
 // redisBridge replaces node_modules/sc-redis. The wire format is unchanged (see
 // below); only the connection layer is delegated now - to go-redis, which owns RESP
@@ -198,7 +220,7 @@ func (b *redisBridge) reportError(err error) {
 	b.mu.Unlock()
 
 	if shouldLog {
-		log.Printf("[redis] %s", message)
+		logWarnf("[redis] %s", message)
 	}
 }
 
@@ -227,7 +249,7 @@ func (b *redisBridge) markActivity() {
 		channels := len(b.subscribed)
 		b.mu.Unlock()
 
-		log.Printf("[redis] connected, subscribed to %d channel(s)", channels)
+		logInfof("[redis] connected, subscribed to %d channel(s)", channels)
 	}
 }
 

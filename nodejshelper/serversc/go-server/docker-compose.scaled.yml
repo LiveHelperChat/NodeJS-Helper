@@ -8,7 +8,7 @@
 #
 # Browsers connect to nginx (`${HTTP_PORT}`, 8080 by default so it can sit next to a
 # single node setup on 8000). The two app containers publish no host ports - that is the
-# point of the proxy. Copy the `nodejshelper-2` block for a third/fourth node.
+# point of the proxy. Copy the `golhchelper-2` block for a third/fourth node.
 #
 # No sticky sessions: every instance shares state through Redis, so any node can serve any
 # browser. See "Running several servers" in README.md for the details and caveats.
@@ -21,7 +21,7 @@
 x-app: &app
   build: .
   # Both services share one image instead of building the context twice.
-  image: lhc-nodejshelper:latest
+  image: remdex/livehelperchat-golhchelper:latest
   restart: unless-stopped
   # One file descriptor per websocket connection - Docker's default soft limit of 1024
   # is reached quickly. Must not be higher than the Docker daemon's own hard limit.
@@ -43,6 +43,14 @@ x-app-env: &app-env
   AUTH_KEY: "${AUTH_KEY:?set AUTH_KEY in .env - the SAME value on every node}"
   TRACK_VISITORS: "${TRACK_VISITORS:-true}"
   ORIGINS: "${ORIGINS:-*:*}"
+  # See the Security section of .env.example. STRICT_CHANNEL_BINDING is what stops
+  # a visitor token from subscribing to another visitor's chat channel.
+  STRICT_CHANNEL_BINDING: "${STRICT_CHANNEL_BINDING:-true}"
+  RESTRICT_CLIENT_PUBLISH: "${RESTRICT_CLIENT_PUBLISH:-false}"
+  # Outbound queue per websocket (~6 KB each at the default of 256).
+  SOCKET_SEND_BUFFER: "${SOCKET_SEND_BUFFER:-256}"
+  # debug adds a line per websocket connect/disconnect (see .env.example).
+  LOG_LEVEL: "${LOG_LEVEL:-info}"
   SOCKETCLUSTER_PORT: "8000"
   REDIS_HOST: redis
   REDIS_PORT: "6379"
@@ -53,7 +61,7 @@ x-app-env: &app-env
   # which is what makes a node ignore only its own Redis echoes.
 
 services:
-  nodejshelper-1:
+  golhchelper-1:
     <<: *app
     depends_on:
       redis:
@@ -61,7 +69,7 @@ services:
     environment:
       <<: *app-env
 
-  nodejshelper-2:
+  golhchelper-2:
     <<: *app
     depends_on:
       redis:
@@ -75,9 +83,9 @@ services:
     depends_on:
       # service_started (not service_healthy) so nginx starts even if a backend is sick;
       # the containers have to exist for nginx to resolve their names at startup.
-      nodejshelper-1:
+      golhchelper-1:
         condition: service_started
-      nodejshelper-2:
+      golhchelper-2:
         condition: service_started
     ports:
       - "${HTTP_PORT:-8080}:80"

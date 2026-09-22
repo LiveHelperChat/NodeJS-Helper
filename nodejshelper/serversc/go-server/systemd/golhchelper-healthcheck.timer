@@ -1,0 +1,26 @@
+# Runs the golhchelper health check every 30 seconds.
+#
+#   sudo install -m 0644 golhchelper-healthcheck.service \
+#                       golhchelper-healthcheck.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now golhchelper-healthcheck.timer
+#
+# Note that restarting golhchelper does not touch this timer - the watchdog keeps running
+# while the server it watches is down, which is exactly what is wanted.
+
+[Unit]
+Description=Run the golhchelper health check every 30 seconds
+Documentation=file:/usr/local/share/doc/golhchelper/README.md
+
+[Timer]
+# First run 60s after boot (give the server, Redis and DNS a moment), then every 30s.
+OnBootSec=60s
+OnUnitActiveSec=30s
+
+# The check itself is quick; this only allows systemd to coalesce the run with other
+# wakeups instead of firing it a second late.
+AccuracySec=1s
+Unit=golhchelper-healthcheck.service
+
+[Install]
+WantedBy=timers.target

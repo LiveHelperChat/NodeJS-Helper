@@ -95,13 +95,15 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			// upgradeWS already answered with an HTTP error when the handshake
 			// was rejected before hijacking the connection.
-			log.Printf("[http] websocket upgrade from %s rejected: %v", r.RemoteAddr, err)
+			logWarnf("[http] websocket upgrade from %s rejected: %v", r.RemoteAddr, err)
 			return
 		}
 
 		socket := newSocket(s, ws)
 		s.registerSocket(socket)
-		log.Printf("[socket %s] connected from %s", socket.id, ws.RemoteAddr())
+		// One line per connection: debug only, otherwise a busy install buries the
+		// warnings under its own reconnects (LOG_LEVEL=debug brings it back).
+		logDebugf("[socket %s] connected from %s", socket.id, ws.RemoteAddr())
 		go socket.run()
 		return
 	}
@@ -118,7 +120,7 @@ func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	setupLogging()
 
 	cfg := loadConfig()
 	srv := newServer(cfg)
@@ -147,7 +149,7 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	log.Printf("[server] listening on %s (websocket path %s, redis %s:%d, instance id %q, track visitors %v)",
+	logInfof("[server] listening on %s (websocket path %s, redis %s:%d, instance id %q, track visitors %v)",
 		addr, cfg.Path, cfg.RedisHost, cfg.RedisPort, cfg.InstanceID, cfg.TrackVisitors)
 
 	go func() {
@@ -160,7 +162,7 @@ func main() {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
 
-	log.Printf("[server] shutting down")
+	logInfof("[server] shutting down")
 
 	// Drop the websockets first so clients can reconnect somewhere else immediately.
 	srv.closeAllSockets(1001, "Server shutting down")
@@ -173,5 +175,5 @@ func main() {
 	defer cancel()
 	_ = httpServer.Shutdown(ctx)
 
-	log.Printf("[server] stopped")
+	logInfof("[server] stopped")
 }
