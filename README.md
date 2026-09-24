@@ -186,3 +186,35 @@ production and use the Go server only for experiments, comparisons and load test
 
 See `nodejshelper/serversc/go-server/README.md` for build instructions, Docker Compose
 usage, scaling, monitoring and troubleshooting details.
+
+### Benchmarks (Go server vs Node.js server)
+
+Both stacks were driven by the same `loadtest` generator on one host (Intel Xeon
+E3-1270 v6, 4 cores / 8 threads, 46 GB RAM, Redis 8.0.5 on loopback, Go 1.26 build
+against Node.js v22.22.1 with its shipped `SOCKETCLUSTER_WORKERS=1`). The
+generator is co-located, so treat these as ballpark figures for a single box. The
+full tables - CPU, RSS, the fan out and storm runs, and the 8 worker variant - are
+in `nodejshelper/serversc/go-server/README.md#measured`, the reproduction steps in
+`nodejshelper/serversc/go-server/loadtest/README.md`.
+
+| | Go | Node.js (1 worker) |
+| --- | --- | --- |
+| fresh start, 0 connections | 14 MB RSS, 1 process, ready in ~0.1 s | 416 MB RSS, 4 processes, ready in ~0.8 s |
+| 2 000 visitors, one private channel each | 2000/2000 opened, subscribe p99 1.2 ms, fan out p99 1 ms, 70 MB RSS | 2000/2000 opened, subscribe p99 7.6 ms, fan out p99 7 ms, 416 MB RSS |
+| 5 000 visitors, one private channel each | 5000/5000 opened, subscribe p99 0.8 ms, fan out p99 1 ms, 146 MB RSS | 5000/5000 opened, subscribe p99 6.3 ms, fan out p99 7 ms, 421 MB RSS |
+| 30 000 idle connections | 30000/30000 opened, subscribe p99 0.6 ms, 67% of a core, 897 MB RSS | 30000/30000 opened, subscribe p99 9.0 ms, 103% of a core, 754 MB RSS |
+| 3 000 visitors on one hot channel | 3000/3000 kept, 7.4 M messages delivered, fan out p99 152 ms | 925/3000 kept, 1.2 M messages delivered, fan out p99 324 ms |
+
+In short: for the layouts Live Helper Chat actually produces (one private channel
+per visitor) both stacks cope with tens of thousands of connections - the Go
+server with roughly ten times lower subscribe latency and a four hundred megabytes
+smaller footprint. The difference shows up on a single hot channel, where the
+Node.js worker stops completing websocket handshakes at about 900 subscribers
+while the Go server holds 3 000 on the same channel and machine.
+
+The hot channel row is a "how much of the requested load did each stack keep
+alive" comparison, not a latency comparison at equal load: the Node.js worker
+never reached 3 000 subscribers, so its fan out latency was measured with two
+thirds fewer sockets on the channel. Adding `SOCKETCLUSTER_WORKERS=8` moves that
+wall to ~2 275 but makes the fan out latency nearly three times worse and grows
+the footprint to 1.4 GB.

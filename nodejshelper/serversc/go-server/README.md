@@ -669,35 +669,154 @@ commands.
 
 ### Measured
 
-8 vCPU host, server and generator on the same machine, all connections on
-loopback, Go 1.21 build. Treat these as ballpark figures for one box: the
-generator holds 50000 goroutines itself and both processes compete for the same 8
-cores, so absolute latency is worse than with a generator on a separate machine
-and CPU figures include that contention.
+Both servers below were driven by the very same `loadtest` binary, on the same
+host, against the same Redis, with the same secret hash, in visitor mode with
+SocketCluster's defaults (`trackVisitors` on, 8 s ping). Each scenario starts
+with a 50 connection warm up and is preceded by a 5 s idle sample.
 
-| scenario | result |
-| --- | --- |
-| 50000 connections, one channel each | 50000/50000 opened, 0 failed, 0 unexpected closes, 4838 conn/s, handshake p50 0.07 ms, login p50 0.06 ms, subscribe p50 0.12 ms |
-| server during that run | 50016 open fds, 1.42 GB peak RSS (~28 KB per connection), 14 threads |
-| server idle, no connections | 0.00% of a core |
-| 20000 connections idle, default 8 s ping | 48% of one core |
-| 20000 connections idle, `PING_INTERVAL_MS=16000` | 11.5% of one core |
-| 10000 operator sockets on one channel, 2 publishes/s | 200000 deliveries, fan out p50 85 ms / p99 201 ms, about 117000 socket writes/s |
-| 5000 *visitors* on one channel | subscribe p50 8.8 s - every subscribe publishes `vi_online` to all 5000 subscribers, so this layout is O(N^2); it is the worst case the tool can produce, not a realistic LHC layout |
+**Host:** Intel Xeon E3-1270 v6, 4 cores / 8 threads @ 3.80 GHz, 46 GB RAM,
+Linux 7.0.0-15-generic. Go 1.26 build, Node.js v22.22.1 (`serversc/lhc` with its
+shipped `SOCKETCLUSTER_WORKERS=1` unless stated), Redis 8.0.5 on loopback. The
+generator runs on the same machine and competes for the same cores - see
+[Two traps](#two-traps-when-the-generator-and-the-server-share-a-host) - so the
+absolute numbers are worse than with a generator on a separate box, and "CPU"
+below is `% of one core` summed over every process of the stack, sampled from
+`/proc` every 200 ms.
+
+#### Realistic layouts (one private `chat_*` channel per connection)
+
+**2 000 connections**, ramp 200/s, one publisher every second:
+
+| | Go | Node.js (1 worker) |
+| --- | --- | --- |
+| opened / failed | 2000 / 0 | 2000 / 0 |
+| handshake p50 / p99 | 0.33 / 0.47 ms | 0.47 / 1.05 ms |
+| login p50 / p99 | 0.47 / 0.65 ms | 0.33 / 0.70 ms |
+| subscribe p50 / p99 | 0.60 / 1.17 ms | 6.00 / 7.60 ms |
+| fan out p50 / p99 | 0.00 / 1.00 ms | 6.00 / 7.00 ms |
+| server CPU avg / peak | 19.5% / 89% | 20.6% / 101% |
+| server RSS peak | 70 MB | 416 MB |
+
+**5 000 connections**, ramp 1000/s, one publisher every second:
+
+| | Go | Node.js (1 worker) |
+| --- | --- | --- |
+| opened / failed | 5000 / 0 | 5000 / 0 |
+| handshake p50 / p99 | 0.17 / 0.37 ms | 0.21 / 0.49 ms |
+| login p50 / p99 | 0.24 / 0.58 ms | 0.13 / 0.41 ms |
+| subscribe p50 / p99 | 0.30 / 0.84 ms | 3.61 / 6.32 ms |
+| fan out p50 / p99 | 1.00 / 1.00 ms | 6.00 / 7.00 ms |
+| server CPU avg / peak | 32.3% / 172% | 29.0% / 120% |
+| server RSS peak | 146 MB | 421 MB |
+
+Idle CPU is dominated by the keep alive ping in both stacks (`PING_INTERVAL_MS`,
+8 s by default), so these figures are mostly "how often do we poke 5 000 sockets".
+Raising `PING_INTERVAL_MS` to 16 s on the Go server took 20 000 idle connections
+from 34.3% to 20.8% of a core - still below the 20 s `pingTimeout` the browser
+client uses. Verify against your own deployment before making it a tuning
+decision.
+
+#### Worst case fan out (3 000 visitors on one channel)
+
+`-chat-ids 1`: every connection subscribes to `chat_900000` and every subscribe
+publishes a `vi_online` presence event to that channel, so the layout is O(N^2) -
+5 publishers every 200 ms plus a presence storm while the connections ramp. It is
+the least realistic and the most revealing scenario:
+
+| | Go | Node.js (1 worker) | Node.js (8 workers) |
+| --- | --- | --- | --- |
+| opened / failed | 3000 / 0 | 925 / **2075** | 2275 / **725** |
+| ramp | 188 conn/s | 91 conn/s | 150 conn/s |
+| handshake p50 / p99 | 1.29 / 479 ms | 0.61 / 119 ms | 21.5 / 1185 ms |
+| subscribe p50 / p99 | 9.19 / 597 ms | 0.65 / 209 ms | 16.4 / 1100 ms |
+| fan out p50 / p99 | 12 / 152 ms | 128 / 324 ms | 235 / 904 ms |
+| publishes delivered | **7 422 292** | 1 235 452 | 4 715 785 |
+| server CPU avg / peak | 292% / 565% | 89% / 127% | 425% / 629% |
+| server RSS peak | 166 MB | 424 MB | 1 462 MB |
+
+The Node.js numbers describe a smaller test than the Go ones: once about 900
+sockets were on the hot channel the event loop could no longer answer a new
+websocket handshake within the generator's 10 s step timeout, so two thirds of the
+connections never opened and the remaining ones shared a much smaller fan out
+than the Go run did. Read the row as "how much of the requested load each stack
+kept alive", not as a latency comparison at equal load.
+
+Before each `#subscribe`, worker.js publishes `vi_online`. That makes the
+incoming rate grow with the square of the subscriber count: a subscriber that
+joins when N are already on the channel costs N deliveries, and every existing
+subscriber absorbs it. The Go server delivered 7.4 M messages in that run
+(about 160 000/s) without losing a socket; the Node.js stack delivered 1.2 M
+with one worker and 4.7 M with eight, and in both cases it lost connections on
+the way.
+
+#### Connection storm (3 000 connections, ramp 0)
+
+All sockets opened as fast as the generator can dial (`-ramp 0`), on the same hot
+channel - a restart of a busy site rather than a normal traffic pattern:
+
+| | Go | Node.js (1 worker) |
+| --- | --- | --- |
+| opened | 3000 in 0.1 s | 746 in 0.1 s |
+| failed | 0 | **2254** (handshake i/o timeout) |
+| failure mode | 1 125 sockets dropped later as slow consumers (`1008 outbound queue full`) | never accepted |
+| subscribe p50 / p99 | 258 / 1 542 ms | 26 / 947 ms |
+
+Neither stack survives this well: Node.js stops answering handshakes, and the Go
+server accepts all 3 000 in a tenth of a second and then evicts the sockets whose
+outbound queue (`SOCKET_SEND_BUFFER`, 256 messages) the generator cannot drain.
+Both failure modes are identical in spirit to SocketCluster's own "socket buffer
+limit exceeded" handling - the difference is which side of the flood they give up
+on.
+
+#### Capacity (idle connections, no publishing)
+
+| connections | metric | Go | Node.js (1 worker) |
+| --- | --- | --- | --- |
+| 20 000, ramp 2000/s | opened / failed | 20000 / 0 | 20000 / 0 |
+| | subscribe p50 / p99 | 0.15 / 0.64 ms | 4.42 / 8.93 ms |
+| | CPU avg / peak | 52.2% / 191% | 79.1% / 228% |
+| | RSS peak | 589 MB | 612 MB |
+| 30 000, ramp 3000/s | opened / failed | 30000 / 0 | 30000 / 0 |
+| | handshake p50 / p99 | 0.06 / 0.27 ms | 0.60 / 1.29 ms |
+| | login p50 / p99 | 0.10 / 0.40 ms | 0.44 / 1.71 ms |
+| | subscribe p50 / p99 | 0.12 / 0.60 ms | 4.41 / 8.99 ms |
+| | CPU avg / peak | 66.8% / 240% | 103.0% / 238% |
+| | RSS peak | 897 MB | 754 MB |
+
+Both stacks hold 30 000 sockets from one process; the Go server answers each
+handshake about ten times faster and each subscribe about 35 times faster, and
+burns about a third less CPU, while the Node.js worker stays a bit smaller in RAM
+at that size because its V8 heap baseline is already large and a JS socket costs
+less *additional* memory than a Go socket does (`~14 KB` vs `~30 KB` per
+connection above the baseline, but the baseline is 416 MB vs 14 MB).
+
+#### Footprint
+
+| | Go | Node.js (1 worker) | Node.js (8 workers) |
+| --- | --- | --- | --- |
+| fresh start, 0 connections | 14 MB RSS, 18 fds, 1 process | 416 MB RSS, 108 fds, 4 processes | 791 MB RSS, 304 fds, 11 processes |
+| ready to serve | ~0.1 s | ~0.8 s | ~0.9 s |
+| deployment | one 11.6 MB static binary | 43 MB `node_modules` + Node.js | same |
 
 Conclusions worth keeping in mind:
 
-* Connection count itself is cheap - tens of thousands per instance, about 28 KB
-  of memory each, no threads per connection.
-* Idle CPU is dominated by the keep alive ping. SocketCluster's 8 s default is
-  conservative; 15 s (still below the 20 s `pingTimeout` the browser client uses)
-  cut idle CPU by a factor of four in the measurement above. The relationship was
-  not linear (48% at 8 s, 11.5% at 16 s), which is what sharing 8 cores with a
-  50000 goroutine generator looks like - verify against your own deployment before
-  making it a tuning decision.
+* Connection count itself is cheap in both stacks - tens of thousands per server
+  from a single process, no thread per connection. Where they differ is latency
+  (subscribe p50 is 10x lower at 2 000 connections and 35x lower at 30 000), CPU
+  per connection, and the fixed 416 MB / 791 MB footprint of the Node.js stack.
+* The place where the two really diverge is a hot channel: the Node.js worker
+  stops completing handshakes at roughly 900 subscribers on one channel, and
+  throwing eight workers at it moves the wall but makes the fan out latency
+  nearly three times worse (the exchange now goes through Redis between workers)
+  and grows the footprint from 424 MB to 1 462 MB.
+* Multi worker Node.js is not a free win: comparing the 8 worker column with the
+  1 worker column, `subscribe` p99 in the 5 000 connection scenario went from
+  6.3 ms to 8.2 ms and RSS from 421 MB to 974 MB.
 * Real LHC traffic gives every visitor a private channel with one or two
   subscribers, so the fan out path is normally exercised with a handful of
-  sockets, not with thousands.
+  sockets, not with thousands. The 2 000 and 5 000 connection scenarios are the
+  ones that look like production; the fan out and storm scenarios are there to
+  show where each stack breaks.
 
 ## Verifying
 
