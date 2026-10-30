@@ -5,9 +5,9 @@ A single binary replacement for the SocketCluster stack that used to live in
 `sc-redis`).
 
 Its only third party dependency is `github.com/redis/go-redis/v9`, the Redis client
-maintained by Redis itself, and it is vendored in `vendor/`. Both `go build` and the
-Docker build use that copy, so neither needs the network (`go.mod` therefore asks for
-Go 1.24 or newer).
+maintained by Redis itself. `vendor/` is *not* committed (it is gitignored), so modules
+are resolved through the usual module proxy/cache — `go mod download` / `go mod vendor`
+when you want an offline copy of your own.
 
 Nothing changes for Live Helper Chat itself:
 
@@ -20,8 +20,9 @@ Nothing changes for Live Helper Chat itself:
 ## Build and run
 
 ```bash
-cd extension/nodejshelper/serversc/new-server
-go build -o lhcnodejs .     # builds from vendor/ (Go >= 1.24), no network needed
+cd extension/nodejshelper/serversc/go-server
+go mod download            # once, needs network
+go build -o lhcnodejs .    # Go >= 1.24
 SECRET_HASH="$(your site.secrethash)" REDIS_HOST=127.0.0.1 ./lhcnodejs
 ```
 

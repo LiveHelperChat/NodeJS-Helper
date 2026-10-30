@@ -1,17 +1,27 @@
-# Build stage. Everything it needs is in the repository (go.mod, go.sum and the vendored
-# copy of go-redis), so no module is downloaded here and the build works offline.
-# The Go image has to satisfy the `go` directive in go.mod (go-redis needs >= 1.24).
+# Build stage. The Go image has to satisfy the `go` directive in go.mod (go 1.24).
+# NOTE: there is deliberately no `COPY vendor/ ./vendor/` here. `vendor/` is gitignored in
+# NodeJS-Helper (nodejshelper/.gitignore), so it only exists in the maintainer's working
+# copy and a fresh clone never has it - `COPY` of a missing directory aborts the whole
+# build ("failed to compute cache key: ... vendor: not found"). Modules are downloaded
+# instead, cached in their own layer keyed only on go.mod/go.sum, so source edits do not
+# re-download them. A local `vendor/` is simply ignored by the image build.
 FROM golang:1.26-alpine AS build
 
 WORKDIR /src
 
+ENV CGO_ENABLED=0 \
+    GOFLAGS= \
+    GOTOOLCHAIN=local
+
+# Small dependency set (go-redis + 3 indirect), so this is quick and only re-runs when
+# go.mod/go.sum change. Requires network on the *first* build of a fresh clone.
 COPY go.mod go.sum ./
-COPY vendor/ ./vendor/
+RUN go mod download
+
+# Sources only - keeps .env, vendor/, loadtest/ and the compose files out of the build.
 COPY *.go ./
 
-# -mod=vendor makes the vendored copy authoritative, so a stale module cache or an
-# inherited GOFLAGS cannot reach the network either.
-RUN CGO_ENABLED=0 go build -mod=vendor -trimpath -ldflags="-s -w" -o /out/lhcnodejs .
+RUN go build -mod=mod -trimpath -ldflags="-s -w" -o /out/lhcnodejs .
 
 # Runtime stage (alpine instead of scratch so CA certificates are available if
 # Redis is ever reached over TLS or the public/ directory is served).
