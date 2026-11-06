@@ -25,7 +25,7 @@ RUN go build -mod=mod -trimpath -ldflags="-s -w" -o /out/lhcnodejs .
 
 # Runtime stage (alpine instead of scratch so CA certificates are available if
 # Redis is ever reached over TLS or the public/ directory is served).
-FROM alpine:3.20
+FROM alpine:3.24
 
 RUN apk add --no-cache ca-certificates && adduser -D -H -u 10001 lhc
 
